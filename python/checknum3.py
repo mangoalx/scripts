@@ -156,7 +156,7 @@ with open(inputfile,'r') as infile:
 		if(len(line)>6):
 			if(line[0] != "0"):		#First char is not 0 then remove it, could be a space or 1
 				line=line[1:]
-			elif(line[6] in "1 .,:!'`"): 
+			elif(line[6] in "1 .,:!'`)"): 
 									#Removing trailing 1 may cause errors
 #			elif(line[6] in " .,:!'`"):		 
 				line=line[:6]		#Takes only first 6 charactors if next one is a '.' or something likewise
