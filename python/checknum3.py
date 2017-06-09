@@ -169,6 +169,8 @@ with open(inputfile,'r') as infile:
 			continue
 		else:
 			otherLine+=1
+			print "other line #####"
+			print(line)
 print "Start number: %d, Last number: %d" %(numStart, numCurrent)
 numTotal= numCurrent-numStart+1				
 print "Total skipped: %d, total number: %d, skip percentage: %f%%" % (totalSkip, numTotal, 100.0*totalSkip/numTotal)
