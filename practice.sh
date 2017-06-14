@@ -1,32 +1,23 @@
 #!/bin/bash
-# 	
+# V0.2 tesseract ocr all jpg files in parallel
+# Authur: John Xu
+# Should check if $1 exists, output to $1 file. If not specified, output to screen
 	if [ -f "$1" ]
 		then
-#		echo "File $1 exists, try another filename"
-			rm $1
-#		exit 1
+		echo "File $1 exists, try another filename"
+		exit 1
 	fi
-
-	count=0
-	total=$(ls -1 *.jpg|wc -l)
-#	echo $total
-#	echo "$((1000*100/${total}))%"
-
-	for f in *.jpg
-	do
-		count=$[$count+1]
-		if [ -z "$1" ]
-			then 
-				tesseract -psm 8 "$f" stdout digits 
-			else 
-				echo "$f---    " >> "$1"
-				tesseract -psm 8 "$f" stdout digits >> "$1"
-		fi
-#		echo $count		
-		echo -n "  $((${count}*100/${total})) %  "
-		echo -n R | tr 'R' '\r'
-#		echo
-#		sleep 0.01
-	done
+	cpus=$( ls -d /sys/devices/system/cpu/cpu[[:digit:]]* | wc -w )
+	
+#	for f in *.jpg
+#	do	
+	#	if [ -z "$1" ]
+	#		then 
+				ls *.jpg | xargs -n 1 -P $cpus tessafile >> "$1"
+	#		else 
+	#			echo "$f---    " >> "$1"
+	#			tesseract -psm 8 "$f" stdout digits >> "$1"
+	#	fi
+#	done
 
 

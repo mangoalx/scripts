@@ -13,8 +13,10 @@
 echo "Tesseracting images, please wait ... "
 	count=0
 	total=$(ls -1 *.jpg|wc -l)
+#	total=$(ls -1 *.tiff|wc -l)
 
 	for f in *.jpg
+#	for f in *.tiff
 	do
 		count=$[$count+1]
 		if [ -z "$1" ]
