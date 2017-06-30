@@ -23,7 +23,7 @@
 			ffmpeg -i "$1" ./tmp/frame-%06d.jpg
 #		then cropjpgs "$2"
 		fi
-		tessfiles output.txt
+		tessfilesm output.txt
 		python $HOME/software/scripts/python/checknum.py output.txt >result.txt
 		tail -n 3 result.txt
 	else

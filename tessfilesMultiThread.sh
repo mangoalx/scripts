@@ -13,7 +13,7 @@
 #	do	
 	#	if [ -z "$1" ]
 	#		then 
-				ls *.jpg | xargs -n 1 -P $cpus tessafile 
+				ls *.jpg | xargs -n 1 -P $cpus tessafile >> "$1"
 	#		else 
 	#			echo "$f---    " >> "$1"
 	#			tesseract -psm 8 "$f" stdout digits >> "$1"
