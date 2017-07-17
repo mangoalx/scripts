@@ -1,6 +1,13 @@
 # gedit backup files
-*.sh~
-*.py~
+*~
+# *.sh~
+# *.py~
 
 # Python compiled files
 *.pyc
+
+# Temporary folder
+temp/
+
+# Downloaded folder
+java/adbcontrol/
