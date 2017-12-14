@@ -14,9 +14,10 @@
 #adb -s "$1" shell echo \$EPOCHREALTIME
 if [ -z "$1" ]
 	then
-		adb shell echo \$EPOCHREALTIME
+		T1=$(adb shell echo \$EPOCHREALTIME | tr -d '\r')
 	else
-		adb -s "$1" shell echo \$EPOCHREALTIME
+		T1=$(adb -s "$1" shell echo \$EPOCHREALTIME | tr -d '\r')
 fi
 # adb shell date +'%s.%N'
-date +'%s.%N'
+T2=$(date +'%s.%N')
+echo $T1, $T2
