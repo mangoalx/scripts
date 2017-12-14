@@ -1,6 +1,7 @@
 # gedit backup files
 *.sh~
 *.py~
+*~
 
 # Python compiled files
 *.pyc
