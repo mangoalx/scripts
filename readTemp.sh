@@ -9,22 +9,28 @@
 #
 #   To specify a device to be read, use its serial number as parameter
 # Version 0.3
-# 	* Add cpu usage reading
-#	* Add parameter intrepreter
-#	* Add help message
+# 	- Add cpu usage reading
+#	- Add parameter intrepreter
+#	- Add help message
+# Version 0.4
+#	* Get cpu usage from top instead of dumpsys cpuinfo
+#	* Add parameter -d for top delay time, 3 as default
 
 ############ Functions
 usage()
 {
-    echo "usage: readTemp.sh [[-h] | [[-c] [SerialNo]]]"
+    echo "usage: readtemp [[-h] | [[-c] [-d delay] [[-s] SerialNo]]]"
 	echo "-h or --help to display this message"
 	echo "-c or --cpu to read cpu load percentage also"
-	echo "SerialNo to specify the device to read from"
+	echo "-d or --delay to specify how long to wait before reading data"
+	echo "              When -c is present, it is delay time for top, default as 3"
+	echo "SerialNo to specify the device to read from. -s or --serial can be omitted"
 }
 
 
 serial= 
 cpuUsage=
+topDelay=3			#top command by default delay 3 seconds
 
 while [ "$1" != "" ]; do
     case $1 in
@@ -33,6 +39,12 @@ while [ "$1" != "" ]; do
                                 ;;
 		-c | --cpu)
 								cpuUsage=1 
+								;;
+		-d | --delay)			shift
+								topDelay=$1
+								;;
+		-s | --serial)			shift
+								serial=$1
 								;;
         * )                     serial=$1
                                 
@@ -45,10 +57,13 @@ if [ -z "$serial" ]
 		adbc="adb shell"
 	else adbc="adb -s $serial shell"
 fi
-#		echo $adbc
+
+if [ "$cpuUsage" = "1" ]; then
+		v0=$($adbc top -d $topDelay -m 1 -n 1|grep %,|sed -e 's/[^0-9 ]//g'|awk '{print $1+$2+$3+$4"%"}')
+else
+	sleep $topDelay
+fi
 		v11=$($adbc cat /sys/devices/virtual/thermal/thermal_zone11/temp | tr -d '\r')
-#		echo $v0,$v11
-#exit
 		v8=$($adbc cat /sys/devices/virtual/thermal/thermal_zone8/temp | tr -d '\r')
 		v9=$($adbc cat /sys/devices/virtual/thermal/thermal_zone9/temp | tr -d '\r')
 		v10=$($adbc cat /sys/devices/virtual/thermal/thermal_zone10/temp | tr -d '\r')
@@ -86,9 +101,11 @@ fi
 
 #fi
 if [ "$cpuUsage" = "1" ]; then
-		v0=$($adbc dumpsys cpuinfo|grep TOTAL|cut -f 1 -d " ")
+#		v0=$($adbc dumpsys cpuinfo|grep TOTAL|cut -f 1 -d " ")
+#		v0=$($adbc top -d $topDelay -m 1 -n 1|grep %,|sed -e 's/[^0-9 ]//g'|awk '{print $1+$2+$3+$4"%"}')
 		echo $(date +"%d-%T"),$v11,$v8,$v9,$v10,$v16,$v14,$v15,$v7,$v1,$v13,$v12,$v6,$v2,$v3,$v4,$v5,$v0
 else
+#	sleep $topDelay
 	echo $(date +"%d-%T"),$v11,$v8,$v9,$v10,$v16,$v14,$v15,$v7,$v1,$v13,$v12,$v6,$v2,$v3,$v4,$v5
 fi
 
