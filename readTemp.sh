@@ -13,14 +13,22 @@
 #	- Add parameter intrepreter
 #	- Add help message
 # Version 0.4
-#	* Get cpu usage from top instead of dumpsys cpuinfo
-#	* Add parameter -d for top delay time, 3 as default
+#	- Get cpu usage from top instead of dumpsys cpuinfo
+#	- Add parameter -d for top delay time, 3 as default
+#	- Show version information
 
 ############ Functions
+version()
+{
+	echo "readTemp.sh version 0.4"
+}
 usage()
 {
+	version
+#	echo "readTemp.sh version 0.4"
     echo "usage: readtemp [[-h] | [[-c] [-d delay] [[-s] SerialNo]]]"
 	echo "-h or --help to display this message"
+	echo "-v or --version to display version information"
 	echo "-c or --cpu to read cpu load percentage also"
 	echo "-d or --delay to specify how long to wait before reading data"
 	echo "              When -c is present, it is delay time for top, default as 3"
@@ -35,6 +43,9 @@ topDelay=3			#top command by default delay 3 seconds
 while [ "$1" != "" ]; do
     case $1 in
         -h | --help )           usage
+                                exit
+                                ;;
+        -v | --version )        version
                                 exit
                                 ;;
 		-c | --cpu)
