@@ -16,11 +16,15 @@
 #	- Get cpu usage from top instead of dumpsys cpuinfo
 #	- Add parameter -d for top delay time, 3 as default
 #	- Show version information
+# Version 0.41
+#	- Wait for adb device when it is not ready before trying to read data
+#	* Print sensor names when -n --name switch is present
+#	* Only read A57 / A53 sensors when specified -7/--A57 -3/--A53 
 
 ############ Functions
 version()
 {
-	echo "readTemp.sh version 0.4"
+	echo "readTemp.sh version 0.41"
 }
 usage()
 {
@@ -33,6 +37,7 @@ usage()
 	echo "-d or --delay to specify how long to wait before reading data"
 	echo "              When -c is present, it is delay time for top, default as 3"
 	echo "SerialNo to specify the device to read from. -s or --serial can be omitted"
+	echo "Please note that the adb command will wait for device to be ready if it is not yet"
 }
 
 
@@ -65,8 +70,8 @@ done
 
 if [ -z "$serial" ]
 	then
-		adbc="adb shell"
-	else adbc="adb -s $serial shell"
+		adbc="adb wait-for-device shell"
+	else adbc="adb -s $serial wait-for-device shell"
 fi
 
 if [ "$cpuUsage" = "1" ]; then

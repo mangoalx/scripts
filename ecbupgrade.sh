@@ -7,6 +7,8 @@
 #	+ Sending upgrade command
 #	- Ask for confirmation before continue
 #	* read control table back
+#	* generate .inf files for firmware .bin and control table .bin if missing
+
 ############ Functions
 version()
 {
@@ -27,7 +29,7 @@ usage()
 	echo "      SerialNo: the serial number of the device to be upgraded"
 }
 
-
+############ main
 serial= 
 action=0
 
