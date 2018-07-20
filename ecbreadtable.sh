@@ -69,9 +69,9 @@ fi
 #adb pull /sdcard/devtable.bin
 
 adbc="$adbs 'am broadcast -a com.videri.ecbservice.ECB_GET_CURRENT_TABLE_ACTION --es ECB_GET_CURRENT_TABLE_EXTRA_PATH $tempFilename '"
-
 echo "$adbc"
 $adbc
+sleep 5				#Wait for a while to let the reading finished
 echo "$adbs pull $tempFilename $localFilename"
 $adbs pull $tempFilename $localFilename
 

@@ -11,3 +11,7 @@ temp/
 
 # Downloaded folder
 java/adbcontrol/
+
+#Python projects
+python/maynuo/
+python/relayControl/
