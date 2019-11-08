@@ -16,6 +16,8 @@
 #	- Get cpu usage from top instead of dumpsys cpuinfo
 #	- Add parameter -d for top delay time, 3 as default
 #	- Show version information
+# Version 0.41
+#	- Add field name for each	
 
 ############ Functions
 version()
@@ -29,12 +31,17 @@ usage()
     echo "usage: readtemp [[-h] | [[-c] [-d delay] [[-s] SerialNo]]]"
 	echo "-h or --help to display this message"
 	echo "-v or --version to display version information"
+	echo "-f or --fieldname to output field names"
 	echo "-c or --cpu to read cpu load percentage also"
 	echo "-d or --delay to specify how long to wait before reading data"
 	echo "              When -c is present, it is delay time for top, default as 3"
 	echo "SerialNo to specify the device to read from. -s or --serial can be omitted"
 }
 
+outfieldname()
+{
+	echo "Timestamp,A53_3,A53_0,A53_1,A53_2,A57_2,A57_0,A57_1,A57_3,A53-A57,GPU1,GPU2,Modem,Hexagon1,Hexagon2,Camera,MDSS,CPU_load"
+}
 
 serial= 
 cpuUsage=
@@ -46,6 +53,9 @@ while [ "$1" != "" ]; do
                                 exit
                                 ;;
         -v | --version )        version
+                                exit
+                                ;;
+        -f | --fieldname )      outfieldname
                                 exit
                                 ;;
 		-c | --cpu)
