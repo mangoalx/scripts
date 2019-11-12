@@ -6,20 +6,18 @@
 # Version 0.1
 # 1 need dxp, so export its path
 # 2 need pycommander environment, should run in its folder, and pipenv ready
-# 3 now removed prompt from pycommander, so cut command is not necessary 
+# 
 count=1
 while true
 	do  echo $count;count=$(($count+1))
 	date +%T
-#	dxp -a10.1.2.42 -s0 -uadmin -padmin
-#	sleep 30
-#	dxp -a10.1.2.42 -s1 -uadmin -padmin
-	python3 pycommander.py -e prod.jsn --id 29493 -c 'su_reboot'
-	sleep 120
-#	speeddata=`python3 pycommander.py -e prod.jsn --id 29493 -c '#tail -n 1 /sdcard/icanvas/*speed.csv'|cut -d' ' -f2`
-#	data=`echo $speeddata|cut -d' ' -f1`
+	dxp -a10.1.2.42 -s0 -uadmin -padmin
+	sleep 30
+	dxp -a10.1.2.42 -s1 -uadmin -padmin
+	sleep 180
+	speeddata=`python3 pycommander.py -e prod.jsn --id 29493 -c '#tail -n 1 /sdcard/icanvas/*speed.csv'|cut -d' ' -f2`
+	data=`echo $speeddata|cut -d' ' -f1`
 #	sleep 2 #wait or pycommander finish
-	data=`python3 pycommander.py -e prod.jsn --id 29493 -c '#tail -n 1 /sdcard/icanvas/*speed.csv'|cut -d' ' -f2`
 	echo $data
 	len=`expr length $data`
 	echo $len
