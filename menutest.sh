@@ -38,12 +38,18 @@ GET_EFIVAR()
     echo "${RET}"
 }
 
+GET_ALLEFIVARS()
+{
+	for f in ${EFIVAR_PATH}/*${GUID}
+		do echo $f;cat  $f;echo;done
+}
+
 partnumber=$(GET_EFIVAR PartNumber)
 #partnumber="VEN048CSVWM00"
 echo "$TAG: partnumber=[$partnumber]"
 
 declare -A canvas_partno			#dictionary for partno to canvas converting
-canvas_partno=([VEN026QSNWM00]=QSMi [VEN032FSNWM00]=3SMi [VEN048CSVWM00]=CC48SMi)
+canvas_partno=([VEN026QSNWM00]=QSMi [VEN026QSNWM50]=QSMi_R211 [VEN032FSNWM00]=3SMi [VEN048CSVWM00]=CC48SMi)
 
 i2cbus=$(ls /sys/bus/pci/devices/0000\:00\:16.2/i2c_designware.2/ | grep i2c | cut -d "-" -f 2)
 echo "$TAG: i2cbus=[$i2cbus]"
@@ -59,7 +65,8 @@ error_check() {
 	MESSAGE="$(eval ${1} 2>&1)"
     if [ $? -ne 0 ]; then
         echo "${TAG}: Command: ${1} Error: ${MESSAGE}"
-		let "$errorCount++"
+		let "errorCount++"
+#		echo "errorCount = $errorCount"
     else
         echo $MESSAGE
     fi
@@ -104,6 +111,7 @@ test_canvas()		#Test a canvas, find sensors and check each of them
 	local sensor=""
 	case $1 in
 		3SMi)	Sensors=("${TSMi_Sensors[@]}");;
+		QSMi_R211) Sensors=("${QSMi_Sensors[@]}");;
 		QSMi)	Sensors=("${QSMi_Sensors[@]}");;
 		CC48SMi)	Sensors=("${CC48SMi_Sensors[@]}");;
 		*)		echo "unknow canvas, could not test it";;
@@ -121,17 +129,18 @@ create_device()		#create a device, $1 as I2C address, thus defined the device ty
 {
 #    echo "$TAG: create i2c and gpio devices."
 	case $1 in
-		40)		error_check "echo hdc1080 0x40 > /sys/class/i2c-dev/i2c-$i2cbus/device/new_device";;
-        41)		error_check "echo ina220 0x41 > /sys/class/i2c-dev/i2c-$i2cbus/device/new_device";;
-        42)		error_check "echo ina220 0x42 > /sys/class/i2c-dev/i2c-$i2cbus/device/new_device";;
-        44)		error_check "echo isl29023 0x44 > /sys/class/i2c-dev/i2c-$i2cbus/device/new_device";;
-        45)		error_check "echo ina220 0x45 > /sys/class/i2c-dev/i2c-$i2cbus/device/new_device";;
-        46)		error_check "echo ina220 0x46 > /sys/class/i2c-dev/i2c-$i2cbus/device/new_device";;
-        48)		error_check "echo tmp275 0x48 > /sys/class/i2c-dev/i2c-$i2cbus/device/new_device";;
-        4d)		error_check "echo ina220 0x4d > /sys/class/i2c-dev/i2c-$i2cbus/device/new_device";;
-        4e)		error_check "echo ina220 0x4e > /sys/class/i2c-dev/i2c-$i2cbus/device/new_device";;
-        6f)		error_check "echo mcp7941x 0x6f > /sys/class/i2c-dev/i2c-$i2cbus/device/new_device";;
-		* )		echo "unknow device, could not create device"
+		40)		error_nocheck "echo hdc1080 0x40 > /sys/class/i2c-dev/i2c-$i2cbus/device/new_device";;
+        41)		error_nocheck "echo ina220 0x41 > /sys/class/i2c-dev/i2c-$i2cbus/device/new_device";;
+        42)		error_nocheck "echo ina220 0x42 > /sys/class/i2c-dev/i2c-$i2cbus/device/new_device";;
+        44)		error_nocheck "echo isl29023 0x44 > /sys/class/i2c-dev/i2c-$i2cbus/device/new_device";;
+        45)		error_nocheck "echo ina220 0x45 > /sys/class/i2c-dev/i2c-$i2cbus/device/new_device";;
+        46)		error_nocheck "echo ina220 0x46 > /sys/class/i2c-dev/i2c-$i2cbus/device/new_device";;
+        48)		error_nocheck "echo tmp275 0x48 > /sys/class/i2c-dev/i2c-$i2cbus/device/new_device";;
+        4d)		error_nocheck "echo ina220 0x4d > /sys/class/i2c-dev/i2c-$i2cbus/device/new_device";;
+        4e)		error_nocheck "echo ina220 0x4e > /sys/class/i2c-dev/i2c-$i2cbus/device/new_device";;
+        6f)		error_nocheck "echo mcp7941x 0x6f > /sys/class/i2c-dev/i2c-$i2cbus/device/new_device";;
+		Re)		error_nocheck "echo 438 > /sys/class/gpio/export";;
+		* )		#echo "unknow device, could not create device"
 	esac
 }
 dump_sensor()		#dump a sensor data, $1 as I2C address
@@ -176,6 +185,36 @@ dump_sensor()		#dump a sensor data, $1 as I2C address
 				;;
         48)		error_check "cat /sys/class/i2c-dev/i2c-$i2cbus/device/$i2cbus-0048/hwmon/hwmon*/temp1_input";;
         6f)		error_check "cat /sys/class/i2c-dev/i2c-$i2cbus/device/$i2cbus-006f/rtc/rtc*/time";;
+
+		Sc)
+			scani2c
+			;;
+		Ma)
+			error_check "cat /sys/class/net/eth0/address"
+			error_check "cat /sys/class/net/wlan0/address"
+			error_check "hcitool dev"
+			;;
+		Ef)
+			GET_ALLEFIVARS;;
+		On)
+			error_check "echo 0 > /sys/class/backlight/intel_backlight/bl_power"
+			;;
+		oF)
+			error_check "echo 1 > /sys/class/backlight/intel_backlight/bl_power"
+			;;
+		Cp)
+			error_check "cat /sys/class/hwmon/hwmon1/temp?_input"
+			;;
+		Re)
+			error_check "cat /sys/class/gpio/gpio438/value"
+			;;
+		Ac)
+			error_check "cat /sys/bus/iio/devices/iio\:device0/*raw"
+			;;
+		Gy)
+			error_check "cat /sys/bus/iio/devices/iio\:device1/*raw"
+			;;
+
 		* )		echo "unknow device, could not dump sensor"
 	esac
 }
@@ -195,12 +234,31 @@ submenu () {
 		"6f - mcp7941x RTC/power_cycle"
 		"Scan I2C bus" 
 		"Mac addresses" 
+		"Efivars"
+		"On - Backlight on"
+		"oFF - Backlight off"
+		"Cpu_temp"
+		"Reset button"
+		"Accelerometer"
+		"Gyrometer"
 		"eXit")
   local opt
   select opt in "${options[@]}"
   do
-		case $REPLY in			#s for scan, x for exit
-			s | S) opt="${options[0]}";;
+		case $REPLY in
+			#s for scan, x for exit, m for mac, e for efi
+			#o for bl on, f for bl off, c for cpu temp
+			#r for reset button, a for accelerometer, g for gyrometer
+			s | S) opt="Scan";;
+			m | M) opt="Mac";;
+			e | F) opt="Efivars";;
+			o | O) opt="On";;
+			f | F) opt="oFF";;
+			c | C) opt="Cpu_temp";;
+			r | R) opt="Reset";;
+			a | A) opt="Accelerometer";;
+			g | G) opt="Gyrometer";;
+
 			x | X) opt="eXit";;
 		esac
 #		if [ "$REPLY" = "q" ] 
@@ -208,19 +266,20 @@ submenu () {
 #				echo "quit chosen"
 #		fi
       case $opt in
-          4* | 6f*)
-#              	echo "you chose $opt"
-				addr=${opt:0:2}
-				test_device "$addr"
-              	;;
-          Scan*)
-              scani2c
-              ;;
-
           eXit)
               return
               ;;
-          *) echo "invalid option $REPLY";;
+#          4* | 6f*)
+#              	echo "you chose $opt"
+		  *)
+				addr=${opt:0:2}
+				test_device "$addr"
+              	;;
+#          Scan*)
+#              scani2c
+#              ;;
+
+#          *) echo "invalid option $REPLY";;
       esac
   done
 }
