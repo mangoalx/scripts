@@ -7,13 +7,30 @@
 # 1 need dxp, so export its path
 # 2 need pycommander environment, should run in its folder, and pipenv ready
 # 3 now removed prompt from pycommander, so cut command is not necessary 
+# Version 0.2
+# 1 function for adb command, check for error and try re-connect
+
 count=0
 failed=0
 canvasIP="10.1.0.17"
 canvasID="29493"
 ibootIP="10.1.2.42"
 adbs="adb -s $canvasIP"
+message=''
 
+connectadb()	# try adb connect over wifi
+{
+	loop=1;while true;do message=`adb connect $canvasIP`;if [[ "$message" == *"connected"* ]]; then break; else echo "retry $loop"; python3 pycommander.py -e prod.jsn --id $canvasID -c 'su_adb_wifi:=5555'; fi;loop=$(($loop+1));if [[ $loop -gt 10 ]]; then break; fi; sleep 10;done
+}
+execadbcmd()	#1.exec adb cmd 2.check for error 3.reconnect if failed 
+{
+	message=$(eval "$adbs ${1}" 2>&1);echo $?
+	if [[ $? != 0 ]]
+	then echo "adb cmd error: $MESSAGE"
+		connectadb						#reconnect adb
+		eval "$adbs ${1}" 2>&1			#try again
+	fi		
+}
 while true
 	do  echo "Total cycles:$count, total failures:$failed";count=$(($count+1))
 	date +%T
@@ -43,23 +60,29 @@ while true
 		fi
 		loop=$(($loop+1));if [[ $loop -gt 10 ]]; then break; fi;
 		echo "Retry pycommander $loop ..."
-		sleep 10
+		sleep 100
 	done
 	if [[ "$response" != *"completed"* ]]; then echo "py_commander_error";continue; fi
 #	python3 pycommander.py -e prod.jsn --id $canvasID -c 'su_shell_cmd:=am broadcast -a com.videri.ecbservice.ECB_GET_CURRENT_TABLE_ACTION --es ECB_GET_CURRENT_TABLE_EXTRA_PATH /sdcard/current_env_table.bin'|grep completed
 #	python3 pycommander.py -e prod.jsn --id 29722 -c 'su_shell_cmd:=am broadcast -a com.videri.ecbservice.ECB_GET_CURRENT_TABLE_ACTION --es ECB_GET_CURRENT_TABLE_EXTRA_PATH /sdcard/current_env_table.bin'|grep completed
 #	data=`adb shell logcat -d|grep APROM|grep -v icanvas`
 #	echo $data
-	loop=1;while true;do message=`adb connect 10.1.0.17`;if [[ "$message" == *"connected"* ]]; then break; else echo "retry $loop"; python3 pycommander.py -e prod.jsn --id $canvasID -c 'su_adb_wifi:=5555'; fi;loop=$(($loop+1));if [[ $loop -gt 10 ]]; then break; fi; sleep 10;done
+#	loop=1;while true;do message=`adb connect 10.1.0.17`;if [[ "$message" == *"connected"* ]]; then break; else echo "retry $loop"; python3 pycommander.py -e prod.jsn --id $canvasID -c 'su_adb_wifi:=5555'; fi;loop=$(($loop+1));if [[ $loop -gt 10 ]]; then break; fi; sleep 10;done
+
+	connectadb
 	if [[ "$message" != *"connected"* ]]; then echo "adb_connection_error";continue; else echo "adb connected"; fi
 	sleep 5
-	$adbs shell logcat -d|grep APROM		#$adbs shell logcat -d|grep APROM|grep -v icanvas
-	len=`$adbs shell cat /sdcard/current_env_table.bin|wc -m`
+
+	execadbcmd "shell logcat -d|grep APROM|grep -v icanvas"
+	echo $message
+#	$adbs shell logcat -d|grep APROM|grep -v icanvas
+	execadbcmd "shell cat /sdcard/current_env_table.bin|wc -m"
+#	len=`$adbs shell cat /sdcard/current_env_table.bin|wc -m`
 #	len=`adb -s 10.1.3.91 shell cat /sdcard/current_env_table.bin|wc -m`
 #	len=`expr length $data`
-	echo $len
+	echo $message
 #	if [[ $len -lt 20 ]] 
-	if [[ $len -lt 200 ]] 
+	if [[ $message -lt 200 ]] 
 #	if [[ "$data" != *"APROM"* ]]
 	then #python3 pycommander.py -e prod.jsn --id 29493 -c '#logcat -d >> /sdcard/icanvas/logerror.log'
 		#python3 pycommander.py -e prod.jsn --id 29493 -c '#dmesg >> /sdcard/icanvas/dmesg.log'
