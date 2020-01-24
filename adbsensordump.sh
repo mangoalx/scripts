@@ -49,7 +49,11 @@ error_check() {
 		len=${#MESSAGE}					# Get the message length. if it is 0 or longer than 8 chars, there is an error ...
 		let "len-=2"
 		ndigits=`echo $MESSAGE | grep -P -o '\d' | wc -l`
+<<<<<<< HEAD
 #		echo "$len ---- $ndigits"
+=======
+		echo "$len ---- $ndigits"
+>>>>>>> dev
 		if [[ $ndigits -lt 1 || $len -gt $ndigits ]]
 		then
 			$adbc log -p e -t "${TAG}" "Command: ${1} Error: ${MESSAGE}"
@@ -146,6 +150,16 @@ error_check "cat ${I2C_BASE_PATH}4b/power1_input"   "ina220-0x4b-power"
 error_check "cat ${I2C_BASE_PATH}4c/in1_input"      "ina220-0x4c-voltage"
 error_check "cat ${I2C_BASE_PATH}4c/curr1_input"    "ina220-0x4c-current"
 error_check "cat ${I2C_BASE_PATH}4c/power1_input"   "ina220-0x4c-power"
+<<<<<<< HEAD
+=======
+if((errorCount == 0))
+then
+	echo "Test passed>>>>>>>>"
+else
+	echo "Test failed, $errorCount errors encountered"
+fi
+exit
+>>>>>>> dev
 # Read from lcc600
 error_check "cat ${I2C_BASE_PATH}5e/in1_input"      "lcc600-0x5e-ac-voltage"
 error_check "cat ${I2C_BASE_PATH}5e/in2_input"      "lcc600-0x5e-24-voltage"
@@ -158,6 +172,7 @@ error_check "cat ${I2C_BASE_PATH}5e/temp3_input"    "lcc600-0x5e-temperature3"
 error_check "cat ${I2C_BASE_PATH}44/iio:device0/in_illuminance0_input"  "isl29023-0x44-illuminance"
 error_check "cat ${I2C_BASE_PATH}44/iio:device0/in_intensity_ir_raw"    "isl29023-0x44-intensity_ir_raw"
 error_check "cat ${I2C_BASE_PATH}44/iio:device0/in_proximity_raw"       "isl29023-0x44-proximity_raw"
+<<<<<<< HEAD
 if((errorCount == 0))
 then
 	echo "Test passed>>>>>>>>"
@@ -165,5 +180,7 @@ else
 	echo "Test failed, $errorCount errors encountered"
 	exit 1
 fi
+=======
+>>>>>>> dev
 
 
