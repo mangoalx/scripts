@@ -3,23 +3,23 @@
 #===========================================================================
 # by John Xu
 # For opci series telemetry test
-# Version 0.1
+# Version 0.2
 #
-#	* Error check (result contains digit number only means success)
-#	* Check different sensors according to part model name or part no.
-#	* Create table or list for dumping for each model
+#	+ Error check (result contains digit number only means success)
+#	+ Check different sensors according to part model name or part no.
+#	+ Create table or list for dumping for each model
 #	- Auto check part no - 
-#	- Allow 'Q' for quit 'A' for auto etc, check $REPLAY and replace $opt before case
-#	* Check if device is already created, remove new_device error
+#	- Allow 'X' for quit 'A' for auto etc, check $REPLAY and replace $opt before case
+#	- Check if device is already created, remove new_device error
 #	
-#	* Mac address
-#	* Efivars
+#	- Mac address
+#	- Efivars
 #	* Backlight (on/off, brightness)
-#	* Cpu_temp (cpu0, cpu1/hwmon1 5 values)
-#	* Reset button
-# 	* Accelerometer
-#	* Gyrometer
-
+#	- Cpu_temp (cpu0, cpu1/hwmon1 5 values)
+#	- Reset button
+# 	- Accelerometer
+#	- Gyrometer
+#	+ QSMi_R211 need verify
 
 TAG="${0##*/}"
 
@@ -95,6 +95,15 @@ QSMi_Sensors=(
 	"4d"
 	"6f"
 )
+QSMi_R211_Sensors=(
+	"40"
+	"41"
+	"45"
+	"46"
+	"48"
+	"4d"
+	"6f"
+)	#removed 42 & 44, from QSMi_Sensors
 	
 scani2c() 			#Scan the I2C bus for available devices
 {
@@ -111,7 +120,7 @@ test_canvas()		#Test a canvas, find sensors and check each of them
 	local sensor=""
 	case $1 in
 		3SMi)	Sensors=("${TSMi_Sensors[@]}");;
-		QSMi_R211) Sensors=("${QSMi_Sensors[@]}");;
+		QSMi_R211) Sensors=("${QSMi_R211_Sensors[@]}");;
 		QSMi)	Sensors=("${QSMi_Sensors[@]}");;
 		CC48SMi)	Sensors=("${CC48SMi_Sensors[@]}");;
 		*)		echo "unknow canvas, could not test it";;
@@ -292,14 +301,16 @@ main()
 			 "Test 3SMi"
 			 "Test QSMi"
 			 "Test CC48SMi"
+			 "Test QSMi_R211"
 			 "eXit")
 	select opt in "${options[@]}"
 	do
-		case $REPLY in			#a for auto, m for manual, 3 for 3smi, q for qsmi, c for cc48smi
+		case $REPLY in			#a for auto, m for manual, 3 for 3smi, q for qsmi, c for cc48smi, r for R211
 			a | A) opt="${options[0]}";;
 			m | M) opt="${options[1]}";;
 			q | Q) opt="${options[3]}";;
 			c | C) opt="${options[4]}";;
+			r | R) opt="${options[5]}";;
 			x | X) opt="eXit";;
 		esac
 #		if [ "$REPLY" = "q" ] 
@@ -314,7 +325,7 @@ main()
 		    "Manually choose sensor to test")
 		        submenu
 		        ;;
-		    *SMi)						#For 3SMi, CC48SMi, QSMi
+		    *SMi*)						#For 3SMi, CC48SMi, QSMi, QSMi_R211
 				arr=($opt)				#put string into an array
 				test_canvas "${arr[1]}"	#index the 2nd word
 		        ;;

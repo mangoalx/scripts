@@ -1,7 +1,9 @@
-#!/bin/bash
+#!/system/bin/sh
 # 
 # by John Xu
 # For DPC4xx device CPU temperature reading
+# Modified from readTemp.sh Version1.0
+#
 # Version 0.2
 #	put all output in single line and seperate each data with a comma, so it will be easily imported into excel
 # 	tr command in each line is used to remove carriage return from each reading output
@@ -19,21 +21,21 @@
 # Version 0.41
 #	- Add field name for each	
 # Version 1.0
-#	- Add sx7 temp reading
-#	- Add prt hdc1080 temperature reading
-#	- Add ecb obs temperature reading (for #U2)
-#	* Convert prt reading to actual degree value
-#		T = (reading/65536)*165-40
+#	* Add sx7 temp reading
+#	* Add prt hdc1080 temperature reading
+#	* Add ecb obs temperature reading (for #U2)
+
+#	# cpu usage is not available because awk is not usable on device
 ############ Functions
 version()
 {
-	echo "readTemp.sh version 1.0"
+	echo "savetemp.sh version 1.0"
 }
 usage()
 {
 	version
 #	echo "readTemp.sh version 0.4"
-    echo "usage: readtemp [[-h] | [[-c] [-d delay] [[-s] SerialNo]]]"
+    echo "usage: savetemp [[-h] | [[-c] [-d delay] [[-s] SerialNo]]]"
 	echo "-h or --help to display this message"
 	echo "-v or --version to display version information"
 	echo "-f or --fieldname to output field names"
@@ -44,7 +46,7 @@ usage()
 
 	echo "-d or --delay to specify how long to wait before reading data"	
 	echo "              When -c is present, it is delay time for top, default as 3"
-	echo "SerialNo to specify the device to read from. -s or --serial can be omitted"
+#	echo "SerialNo to specify the device to read from. -s or --serial can be omitted"
 }
 
 outfieldname()
@@ -81,22 +83,19 @@ getecb()
 {
 	local message=
 	case $1 in
-		00)	message=$($adbc 'nuvoisp -a "AA 10 00 01 00 00 00" |grep "<=="');;
-		01)	message=$($adbc 'nuvoisp -a "AA 10 01 01 00 00 00" |grep "<=="');;
-		02)	message=$($adbc 'nuvoisp -a "AA 10 02 01 00 00 00" |grep "<=="');;
-		03)	message=$($adbc 'nuvoisp -a "AA 10 03 01 00 00 00" |grep "<=="');;
-		04)	message=$($adbc 'nuvoisp -a "AA 10 04 01 00 00 00" |grep "<=="');;
-		05)	message=$($adbc 'nuvoisp -a "AA 10 05 01 00 00 00" |grep "<=="');;
-		06)	message=$($adbc 'nuvoisp -a "AA 10 06 01 00 00 00" |grep "<=="');;
+		00)	message=$(nuvoisp -a "AA 10 00 01 00 00 00" |grep "<==");;
+		01)	message=$(nuvoisp -a "AA 10 01 01 00 00 00" |grep "<==");;
+		02)	message=$(nuvoisp -a "AA 10 02 01 00 00 00" |grep "<==");;
+		03)	message=$(nuvoisp -a "AA 10 03 01 00 00 00" |grep "<==");;
+		04)	message=$(nuvoisp -a "AA 10 04 01 00 00 00" |grep "<==");;
+		05)	message=$(nuvoisp -a "AA 10 05 01 00 00 00" |grep "<==");;
+		06)	message=$(nuvoisp -a "AA 10 06 01 00 00 00" |grep "<==");;
 		*) message=
 	esac
 
-#	local message=$($adbc 'nuvoisp -a "AA 10 ${1} 01 00 00 00" |grep "<=="')
-#	local message=$($adbc 'nuvoisp -a "AA 10 $1 01 00 00 00"')
-#	echo $message >&2
 	echo $( convertecbdata "$message" )
 }
-
+#using array for ecb sensor reading
 ecbSensors=("00" "01" "02" "03" "04" "05")
 serial= 
 cpuUsage=
@@ -133,7 +132,7 @@ while [ "$1" != "" ]; do
 		-d | --delay)			shift
 								topDelay=$1
 								;;
-		-s | --serial)			shift
+		-s | --serial)			shift				#I leave it here, but serial will not be used anywhere
 								serial=$1
 								;;
         * )                     serial=$1
@@ -148,46 +147,39 @@ then
 	exit
 fi
 
-if [ -z "$serial" ]
-	then
-		adbc="adb shell"
-	else adbc="adb -s $serial shell"
-fi
-
-
-	v11=$($adbc cat /sys/devices/virtual/thermal/thermal_zone11/temp | tr -d '\r')
-	v8=$($adbc cat /sys/devices/virtual/thermal/thermal_zone8/temp | tr -d '\r')
-	v9=$($adbc cat /sys/devices/virtual/thermal/thermal_zone9/temp | tr -d '\r')
-	v10=$($adbc cat /sys/devices/virtual/thermal/thermal_zone10/temp | tr -d '\r')
-	v16=$($adbc cat /sys/devices/virtual/thermal/thermal_zone16/temp | tr -d '\r')
-	v14=$($adbc cat /sys/devices/virtual/thermal/thermal_zone14/temp | tr -d '\r')
-	v15=$($adbc cat /sys/devices/virtual/thermal/thermal_zone15/temp | tr -d '\r')
-	v7=$($adbc cat /sys/devices/virtual/thermal/thermal_zone7/temp | tr -d '\r')
-	v1=$($adbc cat /sys/devices/virtual/thermal/thermal_zone1/temp | tr -d '\r')
-	v13=$($adbc cat /sys/devices/virtual/thermal/thermal_zone13/temp | tr -d '\r')
-	v12=$($adbc cat /sys/devices/virtual/thermal/thermal_zone12/temp | tr -d '\r')
-	v6=$($adbc cat /sys/devices/virtual/thermal/thermal_zone6/temp | tr -d '\r')
-	v2=$($adbc cat /sys/devices/virtual/thermal/thermal_zone2/temp | tr -d '\r')
-	v3=$($adbc cat /sys/devices/virtual/thermal/thermal_zone3/temp | tr -d '\r')
-	v4=$($adbc cat /sys/devices/virtual/thermal/thermal_zone4/temp | tr -d '\r')
-	v5=$($adbc cat /sys/devices/virtual/thermal/thermal_zone5/temp | tr -d '\r')
+	v11=$(cat /sys/devices/virtual/thermal/thermal_zone11/temp | tr -d '\r')
+	v8=$(cat /sys/devices/virtual/thermal/thermal_zone8/temp | tr -d '\r')
+	v9=$(cat /sys/devices/virtual/thermal/thermal_zone9/temp | tr -d '\r')
+	v10=$(cat /sys/devices/virtual/thermal/thermal_zone10/temp | tr -d '\r')
+	v16=$(cat /sys/devices/virtual/thermal/thermal_zone16/temp | tr -d '\r')
+	v14=$(cat /sys/devices/virtual/thermal/thermal_zone14/temp | tr -d '\r')
+	v15=$(cat /sys/devices/virtual/thermal/thermal_zone15/temp | tr -d '\r')
+	v7=$(cat /sys/devices/virtual/thermal/thermal_zone7/temp | tr -d '\r')
+	v1=$(cat /sys/devices/virtual/thermal/thermal_zone1/temp | tr -d '\r')
+	v13=$(cat /sys/devices/virtual/thermal/thermal_zone13/temp | tr -d '\r')
+	v12=$(cat /sys/devices/virtual/thermal/thermal_zone12/temp | tr -d '\r')
+	v6=$(cat /sys/devices/virtual/thermal/thermal_zone6/temp | tr -d '\r')
+	v2=$(cat /sys/devices/virtual/thermal/thermal_zone2/temp | tr -d '\r')
+	v3=$(cat /sys/devices/virtual/thermal/thermal_zone3/temp | tr -d '\r')
+	v4=$(cat /sys/devices/virtual/thermal/thermal_zone4/temp | tr -d '\r')
+	v5=$(cat /sys/devices/virtual/thermal/thermal_zone5/temp | tr -d '\r')
 	
 	output="$(date +"%d-%T"),$v11,$v8,$v9,$v10,$v16,$v14,$v15,$v7,$v1,$v13,$v12,$v6,$v2,$v3,$v4,$v5"	
 
 if [ "$cpuUsage" = "1" ]; then
-	v0=$($adbc top -d $topDelay -m 1 -n 1|grep %,|sed -e 's/[^0-9 ]//g'|awk '{print $1+$2+$3+$4"%"}')
+	v0=$(top -d $topDelay -m 1 -n 1|grep %,|sed -e 's/[^0-9 ]//g'|awk '{print $1+$2+$3+$4"%"}')
 	output="${output},$v0"
 else
 	sleep $topDelay
 fi
 if [ "$sx7" = "1" ]; then
-	hexdata=`$adbc '/cache/sx7-tool -a "5c 01 02 00 00 00 00 00 00"'|grep '<==' |cut -d ' ' -f5 `
+	hexdata=`/cache/sx7-tool -a "5c 01 02 00 00 00 00 00 00"|grep '<==' |cut -d ' ' -f5 `
 #	echo $hexdata
 	v0=$((0x${hexdata}))
 	output="${output},$v0"
 fi
 if [ "$prt" = "1" ]; then
-	v0=$($adbc cat /sys/class/i2c-dev/i2c-9/device/9-0040/temp1_input | tr -d '\r')
+	v0=$(cat /sys/class/i2c-dev/i2c-9/device/9-0040/temp1_input | tr -d '\r')
 	output="${output},$v0"
 fi
 if [ "$ecb" = "1" ]; then
