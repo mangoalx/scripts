@@ -9,7 +9,7 @@
 #	+ Check different sensors according to part model name or part no.
 #	+ Create table or list for dumping for each model
 #	- Auto check part no - 
-#	- Allow 'X' for quit 'A' for auto etc, check $REPLAY and replace $opt before case
+#	- Allow 'X' for quit 'A' for auto etc, check $REPLY and replace $opt before case
 #	- Check if device is already created, remove new_device error
 #	
 #	- Mac address
@@ -20,6 +20,13 @@
 # 	- Accelerometer
 #	- Gyrometer
 #	+ QSMi_R211 need verify
+
+#	**** Note that device name Qsmi, 3smi, etc. have to be identical as those in menu
+
+# Version 1.0
+#	- Test functions for firmware/VAL were added
+#	- Test commands sent over "curl" to "127.0.0.1:5000"
+#	- Automatically extract sensor information from jason and read the data (for environment/sensors and /power)
 
 TAG="${0##*/}"
 
@@ -49,13 +56,18 @@ partnumber=$(GET_EFIVAR PartNumber)
 echo "$TAG: partnumber=[$partnumber]"
 
 declare -A canvas_partno			#dictionary for partno to canvas converting
-canvas_partno=([VEN026QSNWM00]=QSMi [VEN026QSNWM50]=QSMi_R211 [VEN032FSNWM00]=3SMi [VEN048CSVWM00]=CC48SMi)
+canvas_partno=([VEN026QSNWM00]=Qsmi [VEN026QSNWM50]=qsmi_R211 [VEN032FSNWM00]=3smi [VEN048CSVWM00]=Cc48smi)
 
 i2cbus=$(ls /sys/bus/pci/devices/0000\:00\:16.2/i2c_designware.2/ | grep i2c | cut -d "-" -f 2)
 echo "$TAG: i2cbus=[$i2cbus]"
 
 errorCount=0				#For counting errors occurred
 
+originOrientation=""
+execDisplay() {
+#	MESSAGE="${1}"
+	eval ${1}
+}
 error_nocheck() {
 #	MESSAGE="${1}"
 	MESSAGE="$(eval ${1} 2>&1)"
@@ -119,10 +131,10 @@ test_canvas()		#Test a canvas, find sensors and check each of them
 	local Sensors=()
 	local sensor=""
 	case $1 in
-		3SMi)	Sensors=("${TSMi_Sensors[@]}");;
-		QSMi_R211) Sensors=("${QSMi_R211_Sensors[@]}");;
-		QSMi)	Sensors=("${QSMi_Sensors[@]}");;
-		CC48SMi)	Sensors=("${CC48SMi_Sensors[@]}");;
+		3smi)	Sensors=("${TSMi_Sensors[@]}");;
+		qsmi_R211) Sensors=("${QSMi_R211_Sensors[@]}");;
+		Qsmi)	Sensors=("${QSMi_Sensors[@]}");;
+		Cc48smi)	Sensors=("${CC48SMi_Sensors[@]}");;
 		*)		echo "unknow canvas, could not test it";;
 	esac
 	echo "testing $1"
@@ -227,10 +239,96 @@ dump_sensor()		#dump a sensor data, $1 as I2C address
 		* )		echo "unknow device, could not dump sensor"
 	esac
 }
-
-submenu () {
-  local PS3='Please select a sensor to test (Enter to re-display the menu): '
-  local options=(
+generate_post_data ()
+{
+  cat <<EOF
+{
+  "orientation": "$1"
+}
+EOF
+}
+generate_patch_data ()
+{
+  cat <<EOF
+{
+  "power": "$1","brightness": "$2"
+}
+EOF
+}
+test_Orientation () {
+	local input
+	originOrientation=$(curl http://127.0.0.1:5000/sysinfo/orientation 2>null | jq '.orientation' | tr -d \")
+	echo "originOrientation= $originOrientation"
+	while true	
+	do
+		read -p 'Input the 1st letter of the orientation to be set (Normal/Inverted/Left/Right/Original), x to exit:' input
+		case $input in
+			n* | N*) input="normal" ;;
+			i* | I*) input="inverted" ;;
+			l* | L*) input="left" ;;
+			r* | R*) input="right" ;;
+			o* | O*) input="$originOrientation" ;;
+			x* | X*) return ;;
+			*) echo "Invalid input"
+				continue
+		esac
+		echo $input
+		curl -i -H "Content-Type: application/json" -X POST -d "$(generate_post_data $input)" http://127.0.0.1:5000/sysinfo/orientation
+	done	
+}
+test_Sensors () {
+	local sensors=$(curl http://127.0.0.1:5000/environment/sensors 2>null | jq '."Environment sensor list"[]' | tr -d \")
+	for s in $sensors
+	do
+		echo "${s}:"
+		curl http://127.0.0.1:5000/environment/sensors/$s
+	done
+}
+test_Power () {
+	local sensors=$(curl http://127.0.0.1:5000/power 2>null | jq '."Power sensor list"[]' | tr -d \")
+	for s in $sensors
+	do
+		echo "${s}:"
+		curl http://127.0.0.1:5000/power/$s
+	done
+}
+test_Backlight () {
+	local brightness power
+	while true
+	do
+		read -p 'Input the desired brightness [0 to 100, 0 for off, x to exit]:' brightness
+		if [ -z $brightness ]
+			then continue
+		fi
+		case $brightness in
+			0) power="off" ;;
+			x* | X*) return ;;
+			*) power="on" ;;
+		esac
+#		curl -i -H "Content-Type: application/json" -X PATCH -d '{"power":"on", "brightness": 25}' http://127.0.0.1:5000/display/backlight
+#		echo $(generate_patch_data $brightness $power)
+		curl -i -H "Content-Type: application/json" -X PATCH -d "$(generate_patch_data $power $brightness)" http://127.0.0.1:5000/display/backlight
+	done
+}
+test_Resetbutton () {
+	local answer
+	echo "Testing reset button ... press Enter to quit!"
+	while true
+	do
+		read -t 1 -n 1 answer
+		if [ $? == 0 ]; then		#timeout without user input
+			if [ -z $answer ]
+				then break
+			fi
+			continue				#if user input something, skip the reading
+		else						#timeout without input, then test reset button
+			echo -n $(curl http://127.0.0.1:5000/sysinfo/resetbutton 2>null | jq '."Reset Button"' | tr -d \n\")
+		fi
+	done
+}
+submenuM () {
+	local PS3='Please select a sensor to test (Enter to re-display the menu): '
+	local options=(
 		"40 - hdc1080 temp/humi" 
 		"41 - ina220 Tcon 12V/10V" 
 		"42 - ina220 VBB 12V/10V" 
@@ -241,19 +339,19 @@ submenu () {
 		"4d - ina220 Backlight L 24V" 
 		"4e - ina220 Backlight R 24V" 
 		"6f - mcp7941x RTC/power_cycle"
-		"Scan I2C bus" 
+		"Scan i2c bus" 
 		"Mac addresses" 
 		"Efivars"
-		"On - Backlight on"
-		"oFF - Backlight off"
+		"On - backlight on"
+		"oFF - backlight off"
 		"Cpu_temp"
 		"Reset button"
 		"Accelerometer"
 		"Gyrometer"
 		"eXit")
-  local opt
-  select opt in "${options[@]}"
-  do
+	local opt
+	select opt in "${options[@]}"
+	do
 		case $REPLY in
 			#s for scan, x for exit, m for mac, e for efi
 			#o for bl on, f for bl off, c for cpu temp
@@ -274,7 +372,7 @@ submenu () {
 #			then opt="Quit"
 #				echo "quit chosen"
 #		fi
-      case $opt in
+		case $opt in
           eXit)
               return
               ;;
@@ -289,8 +387,132 @@ submenu () {
 #              ;;
 
 #          *) echo "invalid option $REPLY";;
-      esac
-  done
+		esac
+	done
+}
+submenuF () {
+	local PS3='Please select an item to test (Enter to re-display the menu): '
+	local options=(
+		"firmware Version" 
+		"Resolution dimension"
+		"sysInfo"
+		"Backlight"
+		"Sensors"
+		"Power"
+		"eXit")
+	local opt
+	select opt in "${options[@]}"
+	do
+		case $REPLY in
+			#s for scan, x for exit, m for mac, e for efi
+			#o for bl on, f for bl off, c for cpu temp
+			#r for reset button, a for accelerometer, g for gyrometer
+			v | V) opt="firmware Version";;
+			r | R) opt="Resolution dimension";;
+			i | I) opt="sysInfo";;
+			b | B) opt="Backlight";;
+			s | S) opt="Sensors";;
+			p | P) opt="Power";;
+			x | X) opt="eXit";;
+		esac
+
+		case $opt in
+			eXit)
+				return
+				;;
+			fi*)				#firmware Version
+				cat /etc/version
+				;;
+			Re*)				#Resolution dimension
+				DISPLAY=:0 xdpyinfo|grep dim
+				;;
+			sy*)				#sysInfo
+				execDisplay "curl http://127.0.0.1:5000/sysinfo"
+				submenuSysinfo
+				;;
+			Ba*)				#Backlight 
+				test_Backlight ;;
+			Se*)				#Sensors
+				execDisplay "curl http://127.0.0.1:5000/environment/sensors"
+				test_Sensors
+				;;
+			Po*)				#Power
+				execDisplay "curl http://127.0.0.1:5000/power"
+				test_Power
+				;;
+			*)
+				echo "you chose $opt"
+              	;;
+		esac
+	done
+}
+submenuSysinfo () {
+	local PS3='Please select an item to test (Enter to re-display the menu): '
+	local options=(
+		"forceUpdate" 
+		"Model"
+		"selfTest"
+		"Status"
+		"Resetbutton"
+		"sN"
+		"Apps"
+		"Orientation"
+		"Powercycle(reboot)"
+		"eXit")
+	local opt
+	select opt in "${options[@]}"
+	do
+		case $REPLY in
+			u | U) opt="forceUpdate";;
+			m | M) opt="Model";;
+			t | T) opt="selfTest";;
+			s | S) opt="Status";;
+			r | R) opt="Resetbutton";;
+			n | N) opt="sN";;
+			a | A) opt="Apps";;
+			p | P) opt="Powercycle";;
+			o | O) opt="Orientation";;
+			x | X) opt="eXit";;
+		esac
+
+		case $opt in
+			eXit)
+				return
+				;;
+			fo*)				#forceUpdate
+				echo "Executing force update, please wait ... "
+				curl -i -H "Content-Type: application/json" -X POST -d '{"update": true}' http://127.0.0.1:5000/sysinfo/forceupdate
+				;;
+			Mo*)				#Model
+				curl http://127.0.0.1:5000/sysinfo/model
+				;;
+			se*)				#selfTest
+				curl http://127.0.0.1:5000/sysinfo/selftest				
+				;;
+			St*)				#Status
+				curl http://127.0.0.1:5000/sysinfo/status
+				;;
+			Re*)				#Resetbutton
+#				curl http://127.0.0.1:5000/sysinfo/resetbutton
+				test_Resetbutton ;;
+			sN*)				#SN
+				curl http://127.0.0.1:5000/sysinfo/SN
+				;;
+			Ap*)				#Apps
+				curl http://127.0.0.1:5000/sysinfo/apps
+				;;
+			Po*)				#Powercycle
+				curl -i -H "Content-Type: application/json" -X POST -d '{"reboot": true}' http://127.0.0.1:5000/sysinfo/powercycle
+				;;
+			Or*)				#Orientation
+				curl http://127.0.0.1:5000/sysinfo/orientation
+				test_Orientation
+				;;
+			*)
+				echo "you've chosen $opt"
+              	;;
+		esac
+	done
 }
 main()
 {
@@ -298,10 +520,12 @@ main()
 	PS3='Please enter your choice (Enter to re-display the menu): '
 	options=("Automatically test based on partnumber"
 			 "Manually choose sensor to test"
-			 "Test 3SMi"
-			 "Test QSMi"
-			 "Test CC48SMi"
-			 "Test QSMi_R211"
+			 "test 3smi"
+			 "test Qsmi"
+			 "test Cc48smi"
+			 "test qsmi_R211"
+			 "test Firmware/val"
+			 "Power cycle"
 			 "eXit")
 	select opt in "${options[@]}"
 	do
@@ -311,6 +535,8 @@ main()
 			q | Q) opt="${options[3]}";;
 			c | C) opt="${options[4]}";;
 			r | R) opt="${options[5]}";;
+			f | F) opt="${options[6]}";;
+			p | P) opt="Power cycle";;
 			x | X) opt="eXit";;
 		esac
 #		if [ "$REPLY" = "q" ] 
@@ -321,11 +547,16 @@ main()
 			"Automatically test based on partnumber")
 				test_canvas "${canvas_partno[$partnumber]}"
 				;;
-			
 		    "Manually choose sensor to test")
-		        submenu
+		        submenuM
 		        ;;
-		    *SMi*)						#For 3SMi, CC48SMi, QSMi, QSMi_R211
+		    "test Firmware/val")
+		        submenuF
+		        ;;
+		    "Power cycle")
+		        sudo reboot power_cycle
+		        ;;
+		    *smi*)						#For 3SMi, CC48SMi, QSMi, QSMi_R211
 				arr=($opt)				#put string into an array
 				test_canvas "${arr[1]}"	#index the 2nd word
 		        ;;
