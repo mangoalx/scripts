@@ -11,14 +11,13 @@ temp/
 
 # Downloaded folder
 java/adbcontrol/
-<<<<<<< HEAD
 
-#Python projects
+
+# Python projects
 python/maynuo/
 python/relayControl/
-=======
+
 python/maynuo
 python/relayControl/4*/
 python/relayControl/4*
 
->>>>>>> dev
