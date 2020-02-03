@@ -17,16 +17,9 @@
 #	- Add parameter -d for top delay time, 3 as default
 #	- Show version information
 # Version 0.41
-<<<<<<< HEAD
 #	- Wait for adb device when it is not ready before trying to read data
 #	* Print sensor names when -n --name switch is present
 #	* Only read A57 / A53 sensors when specified -7/--A57 -3/--A53 
-
-############ Functions
-version()
-{
-	echo "readTemp.sh version 0.41"
-=======
 #	- Add field name for each	
 # Version 1.0
 #	- Add sx7 temp reading
@@ -34,29 +27,35 @@ version()
 #	- Add ecb obs temperature reading (for #U2)
 #	* Convert prt reading to actual degree value
 #		T = (reading/65536)*165-40
+# Version 1.1
+#	+ version and usage funcs revised
+#	* prt reading conversion
+#=========================================================================
+TAG="${0##*/}"				#get the base name of itself
 ############ Functions
+Version="1.1"
 version()
 {
-	echo "readTemp.sh version 1.0"
->>>>>>> dev
+	echo "$TAG version $Version"
 }
 usage()
 {
 	version
-#	echo "readTemp.sh version 0.4"
-    echo "usage: readtemp [[-h] | [[-c] [-d delay] [[-s] SerialNo]]]"
-	echo "-h or --help to display this message"
-	echo "-v or --version to display version information"
-	echo "-f or --fieldname to output field names"
-	echo "-c or --cpu to read cpu load percentage also"
-	echo "-x or --sx7 to read sx7 temperature"
-	echo "-p or --prt to read prt on board temperature"
-	echo "-e or --ecb to read ecb off board temperature sensors"
+	cat << EOF
+	USAGE: $TAG [-hvfcxpe] [-d <delay>] [[-s] <serialNo>]
+		-h or --help to display this message
+		-v or --version to display version information
+		-f or --fieldname to output field names
+		-c or --cpu to read cpu load percentage also
+		-x or --sx7 to read sx7 temperature
+		-p or --prt to read prt on board temperature
+		-e or --ecb to read ecb off board temperature sensors
 
-	echo "-d or --delay to specify how long to wait before reading data"	
-	echo "              When -c is present, it is delay time for top, default as 3"
-	echo "SerialNo to specify the device to read from. -s or --serial can be omitted"
-	echo "Please note that the adb command will wait for device to be ready if it is not yet"
+		-d or --delay to specify how long to wait before reading data
+		              When -c is present, it is delay time for top, default as 3
+		SerialNo to specify the device to read from. -s or --serial can be omitted
+		Please note that the adb command will wait for device to be ready if it is not yet
+EOF
 }
 
 outfieldname()
@@ -107,6 +106,13 @@ getecb()
 #	local message=$($adbc 'nuvoisp -a "AA 10 $1 01 00 00 00"')
 #	echo $message >&2
 	echo $( convertecbdata "$message" )
+}
+
+convertprttemp()
+{
+	local data=$1
+	local result=$(($data*1650/65536-400))		#to get 1 digit decimal, multiple the formula with 10
+	echo "${result:0:-1}.${result: -1}"			#then display the point before last digit
 }
 
 ecbSensors=("00" "01" "02" "03" "04" "05")
@@ -199,7 +205,8 @@ if [ "$sx7" = "1" ]; then
 	output="${output},$v0"
 fi
 if [ "$prt" = "1" ]; then
-	v0=$($adbc cat /sys/class/i2c-dev/i2c-9/device/9-0040/temp1_input | tr -d '\r')
+	data=$($adbc cat /sys/class/i2c-dev/i2c-9/device/9-0040/temp1_input | tr -d '\r')
+	v0=$(convertprttemp $data)			#convert raw data to float temperature degree
 	output="${output},$v0"
 fi
 if [ "$ecb" = "1" ]; then
