@@ -25,11 +25,11 @@
 #	- Add sx7 temp reading
 #	- Add prt hdc1080 temperature reading
 #	- Add ecb obs temperature reading (for #U2)
-#	* Convert prt reading to actual degree value
-#		T = (reading/65536)*165-40
 # Version 1.1
-#	+ version and usage funcs revised
-#	* prt reading conversion
+#	- version and usage funcs revised
+#	- prt reading conversion (1-digit float). Convert prt reading to actual degree value
+#		T = (reading/65536)*165-40
+#	* allow to specify where to find sx7 and nuvoisp tools
 #=========================================================================
 TAG="${0##*/}"				#get the base name of itself
 ############ Functions
