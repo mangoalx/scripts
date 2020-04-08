@@ -3,11 +3,6 @@
 #===========================================================================
 # by John Xu
 # For opci series telemetry test
-# Version 0.3
-#	- ecb related test (val)
-#	+ hardware test for 8u2i
-#	- Main menu only for hardware & firmware test
-#	* allow input 2 letters as menu selection (if $opt=='' then opt=option)
 # Version 0.2
 #
 #	- Error check (result contains digit number only means success)
@@ -33,6 +28,11 @@
 #	- Test commands sent over "curl" to "127.0.0.1:5000"
 #	- Automatically extract sensor information from jason and read the data (for environment/sensors and /power)
 #	* backlight test, read current backlight first
+# Version 1.1
+#	- ecb related test (val)
+#	+ hardware test for 8u2i
+#	- Main menu only for hardware & firmware test
+#	* allow input 2 letters as menu selection (if $opt=='' then opt=option)
 
 TAG="${0##*/}"
 
