@@ -3,10 +3,15 @@
 #===========================================================================
 # by John Xu
 # For opci series telemetry test
+# Version 0.3
+#	- ecb related test (val)
+#	+ hardware test for 8u2i
+#	- Main menu only for hardware & firmware test
+#	* allow input 2 letters as menu selection (if $opt=='' then opt=option)
 # Version 0.2
 #
-#	+ Error check (result contains digit number only means success)
-#	+ Check different sensors according to part model name or part no.
+#	- Error check (result contains digit number only means success)
+#	- Check different sensors according to part model name or part no.
 #	+ Create table or list for dumping for each model
 #	- Auto check part no - 
 #	- Allow 'X' for quit 'A' for auto etc, check $REPLY and replace $opt before case
@@ -14,12 +19,12 @@
 #	
 #	- Mac address
 #	- Efivars
-#	* Backlight (on/off, brightness)
+#	- Backlight (on/off, brightness)
 #	- Cpu_temp (cpu0, cpu1/hwmon1 5 values)
 #	- Reset button
 # 	- Accelerometer
 #	- Gyrometer
-#	+ QSMi_R211 need verify
+#	- QSMi_R211 need verify
 
 #	**** Note that device name Qsmi, 3smi, etc. have to be identical as those in menu
 
@@ -27,6 +32,7 @@
 #	- Test functions for firmware/VAL were added
 #	- Test commands sent over "curl" to "127.0.0.1:5000"
 #	- Automatically extract sensor information from jason and read the data (for environment/sensors and /power)
+#	* backlight test, read current backlight first
 
 TAG="${0##*/}"
 
@@ -56,7 +62,7 @@ partnumber=$(GET_EFIVAR PartNumber)
 echo "$TAG: partnumber=[$partnumber]"
 
 declare -A canvas_partno			#dictionary for partno to canvas converting
-canvas_partno=([VEN026QSNWM00]=Qsmi [VEN026QSNWM50]=qsmi_R211 [VEN032FSNWM00]=3smi [VEN048CSVWM00]=Cc48smi)
+canvas_partno=([VEN026QSNWM00]=Qsmi [VEN026QSNWM50]=qsmi_R211 [VEN032FSNWM00]=3smi [VEN048CSVWM00]=Cc48smi [VEN075ULPWB10]=8U2i)
 
 i2cbus=$(ls /sys/bus/pci/devices/0000\:00\:16.2/i2c_designware.2/ | grep i2c | cut -d "-" -f 2)
 echo "$TAG: i2cbus=[$i2cbus]"
@@ -83,7 +89,8 @@ error_check() {
         echo $MESSAGE
     fi
 }
-
+#number could not be used as 1st letter of a name, so use E instead of 8 for 8u2i
+EU2i_Sensors=("40" "41" "44" "45" "46" "4f" "6f")
 CC48SMi_Sensors=("40" "41" "42" "44" "45" "46" "48" "4d" "4e" "6f")
 TSMi_Sensors=(				#number could not be used as 1st letter of a name, so use T instead of 3
 	"40"
@@ -131,11 +138,13 @@ test_canvas()		#Test a canvas, find sensors and check each of them
 	local Sensors=()
 	local sensor=""
 	case $1 in
+		8U2i)	Sensors=("${EU2i_Sensors[@]}");;
 		3smi)	Sensors=("${TSMi_Sensors[@]}");;
 		qsmi_R211) Sensors=("${QSMi_R211_Sensors[@]}");;
 		Qsmi)	Sensors=("${QSMi_Sensors[@]}");;
 		Cc48smi)	Sensors=("${CC48SMi_Sensors[@]}");;
-		*)		echo "unknow canvas, could not test it";;
+		*)		echo "unknow canvas $1, could not test it"
+				return;;
 	esac
 	echo "testing $1"
 	errorCount=0
@@ -159,6 +168,7 @@ create_device()		#create a device, $1 as I2C address, thus defined the device ty
         48)		error_nocheck "echo tmp275 0x48 > /sys/class/i2c-dev/i2c-$i2cbus/device/new_device";;
         4d)		error_nocheck "echo ina220 0x4d > /sys/class/i2c-dev/i2c-$i2cbus/device/new_device";;
         4e)		error_nocheck "echo ina220 0x4e > /sys/class/i2c-dev/i2c-$i2cbus/device/new_device";;
+        4f)		error_nocheck "echo ina220 0x4f > /sys/class/i2c-dev/i2c-$i2cbus/device/new_device";;
         6f)		error_nocheck "echo mcp7941x 0x6f > /sys/class/i2c-dev/i2c-$i2cbus/device/new_device";;
 		Re)		error_nocheck "echo 438 > /sys/class/gpio/export";;
 		* )		#echo "unknow device, could not create device"
@@ -200,6 +210,11 @@ dump_sensor()		#dump a sensor data, $1 as I2C address
         		error_check "cat /sys/class/i2c-dev/i2c-$i2cbus/device/$i2cbus-004e/hwmon/hwmon*/in1_input"
         		error_check "cat /sys/class/i2c-dev/i2c-$i2cbus/device/$i2cbus-004e/hwmon/hwmon*/curr1_input"
         		error_check "cat /sys/class/i2c-dev/i2c-$i2cbus/device/$i2cbus-004e/hwmon/hwmon*/power1_input"
+				;;
+        4f)		error_check "cat /sys/class/i2c-dev/i2c-$i2cbus/device/$i2cbus-004f/hwmon/hwmon*/in0_input"
+        		error_check "cat /sys/class/i2c-dev/i2c-$i2cbus/device/$i2cbus-004f/hwmon/hwmon*/in1_input"
+        		error_check "cat /sys/class/i2c-dev/i2c-$i2cbus/device/$i2cbus-004f/hwmon/hwmon*/curr1_input"
+        		error_check "cat /sys/class/i2c-dev/i2c-$i2cbus/device/$i2cbus-004f/hwmon/hwmon*/power1_input"
 				;;
         44)		error_check "cat /sys/class/i2c-dev/i2c-$i2cbus/device/$i2cbus-0044/iio\:device*/in_illuminance0_input"
 				error_check "cat /sys/class/i2c-dev/i2c-$i2cbus/device/$i2cbus-0044/iio\:device*/in_intensity_ir_raw"
@@ -296,9 +311,10 @@ test_Backlight () {
 	local brightness power
 	while true
 	do
-		read -p 'Input the desired brightness [0 to 100, 0 for off, x to exit]:' brightness
+		read -p 'Input the desired brightness [0 to 100, 0 for off, x to exit, Enter to read]:' brightness
 		if [ -z $brightness ]
-			then continue
+			then 	curl http://127.0.0.1:5000/display/backlight
+			continue
 		fi
 		case $brightness in
 			0) power="off" ;;
@@ -338,6 +354,7 @@ submenuM () {
 		"48 - tmp275 Internal temp" 
 		"4d - ina220 Backlight L 24V" 
 		"4e - ina220 Backlight R 24V" 
+		"4f - ina220 Prt-24V" 
 		"6f - mcp7941x RTC/power_cycle"
 		"Scan i2c bus" 
 		"Mac addresses" 
@@ -399,6 +416,7 @@ submenuF () {
 		"Backlight"
 		"Sensors"
 		"Power"
+		"Ecb_8u2i"
 		"eXit")
 	local opt
 	select opt in "${options[@]}"
@@ -413,6 +431,7 @@ submenuF () {
 			b | B) opt="Backlight";;
 			s | S) opt="Sensors";;
 			p | P) opt="Power";;
+			e | E) opt="Ecb_8u2i";;
 			x | X) opt="eXit";;
 		esac
 
@@ -440,8 +459,12 @@ submenuF () {
 				execDisplay "curl http://127.0.0.1:5000/power"
 				test_Power
 				;;
+			Ec*)				#Ecb_8u2i
+				execDisplay "curl http://127.0.0.1:5000/ecb"
+				submenuEcb
+				;;
 			*)
-				echo "you chose $opt"
+				echo "Invalid option $opt"
               	;;
 		esac
 	done
@@ -509,24 +532,80 @@ submenuSysinfo () {
 				test_Orientation
 				;;
 			*)
-				echo "you've chosen $opt"
+				echo "Invalid option $opt"
               	;;
 		esac
 	done
 }
-main()
+submenuEcb () {
+	local PS3='Please select an item to test (Enter to re-display the menu): '
+	local options=(
+		"Ecb_table" 
+		"Update"
+		"Door_alert"
+		"Assembly"
+		"Fan_alert"
+		"State"
+		"Temperature_alert"
+		"eXit")
+	local opt
+	select opt in "${options[@]}"
+	do
+		case $REPLY in
+			e | E) opt="Ecb_table";;
+			u | U) opt="Update";;
+			d | D) opt="Door_alert";;
+			a | A) opt="Assembly";;
+			f | F) opt="Fan_alert";;
+			s | S) opt="State";;
+			t | T) opt="Temperature_alert";;
+			x | X) opt="eXit";;
+		esac
+
+		case $opt in
+			eXit)
+				return
+				;;
+			Ec*)				#Ecb_table
+				curl http://127.0.0.1:5000/ecb/ecb_table | hexdump -C
+				;;
+			Up*)				#Update
+				curl http://127.0.0.1:5000/ecb/update
+				;;
+			Do*)				#Door_alert
+				curl http://127.0.0.1:5000/ecb/door_alert				
+				;;
+			As*)				#Assembly
+				curl http://127.0.0.1:5000/ecb/assembly
+				;;
+			Fa*)				#Fan_alert
+				curl http://127.0.0.1:5000/ecb/fan_alert
+				;;
+			St*)				#State
+				curl http://127.0.0.1:5000/ecb/state
+				;;
+			Te*)				#Temperature_alert
+				curl http://127.0.0.1:5000/ecb/temperature_alert
+				;;
+			*)
+				echo "Invalid option $opt"
+              	;;
+		esac
+	done
+}
+submenuH()
 {
-	echo "Videri OPCi Telemetry Test"
-	PS3='Please enter your choice (Enter to re-display the menu): '
-	options=("Automatically test based on partnumber"
+	echo "Videri OPCi Hardware Test"
+	local PS3='Please enter your choice (Enter to re-display the menu): '
+	local options=("Automatically test based on partnumber"
 			 "Manually choose sensor to test"
 			 "test 3smi"
 			 "test Qsmi"
 			 "test Cc48smi"
 			 "test qsmi_R211"
-			 "test Firmware/val"
-			 "Power cycle"
+			 "test 8U2i"
 			 "eXit")
+	local opt
 	select opt in "${options[@]}"
 	do
 		case $REPLY in			#a for auto, m for manual, 3 for 3smi, q for qsmi, c for cc48smi, r for R211
@@ -535,8 +614,7 @@ main()
 			q | Q) opt="${options[3]}";;
 			c | C) opt="${options[4]}";;
 			r | R) opt="${options[5]}";;
-			f | F) opt="${options[6]}";;
-			p | P) opt="Power cycle";;
+			u | U) opt="${options[6]}";;
 			x | X) opt="eXit";;
 		esac
 #		if [ "$REPLY" = "q" ] 
@@ -550,15 +628,43 @@ main()
 		    "Manually choose sensor to test")
 		        submenuM
 		        ;;
+		    *smi* | *8U*)				#For 3SMi, CC48SMi, QSMi, QSMi_R211, 8U2i
+				arr=($opt)				#put string into an array
+				test_canvas "${arr[1]}"	#index the 2nd word
+		        ;;
+		    "eXit")
+		        return
+		        ;;
+		    *) echo "invalid option $REPLY, opt is $opt";;
+		esac
+	done
+}
+main()
+{
+	echo "Videri OPCi Telemetry Test"
+	PS3='Please enter your choice (Enter to re-display the menu): '
+	options=("test Hardware"
+			 "test Firmware/val"
+			 "Power cycle"
+			 "eXit")
+	select opt in "${options[@]}"
+	do
+		case $REPLY in			
+			h | H) opt="${options[0]}";;
+			f | F) opt="${options[1]}";;
+			p | P) opt="Power cycle";;
+			x | X) opt="eXit";;
+		esac
+
+		case $opt in
+		    "test Hardware")
+		        submenuH
+		        ;;
 		    "test Firmware/val")
 		        submenuF
 		        ;;
 		    "Power cycle")
 		        sudo reboot power_cycle
-		        ;;
-		    *smi*)						#For 3SMi, CC48SMi, QSMi, QSMi_R211
-				arr=($opt)				#put string into an array
-				test_canvas "${arr[1]}"	#index the 2nd word
 		        ;;
 		    "eXit")
 		        break
