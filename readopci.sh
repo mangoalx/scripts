@@ -21,7 +21,7 @@ usage()	#edit
 {
 	version
 	cat << EOF
-	USAGE: $TAG [-hvfc] [-p program] [-u username] [-w password] [-i i2caddr] [-a] <ipaddress>
+	USAGE: $TAG [-hvfc] [-p program] [-u username] [-w password] [-b i2cbus] [-i "i2caddr0 i2caddr1 ..."] [-a] <ipaddress>
 		-h or --help to display this message
 		-v or --version to display version information
 		-f or --fieldname to output field names
@@ -47,7 +47,9 @@ outfieldname()
 		output="${output}, ${program}"
 	fi
 	if [ "$i2caddr" != "" ]; then
-		output="${output}, V_${i2caddr}, C_${i2caddr}"
+		for addr in ${i2caddr}; do
+			output="${output}, V_${addr}, C_${addr}"
+		done
 	fi
 
 	echo $output
@@ -92,7 +94,7 @@ convertprttemp()	#edit
 }
 
 #ecbSensors=("00" "01" "02" "03" "04" "05")
-address="192.168.1.19"
+address=
 cpuUsage=
 field=
 program=
@@ -125,7 +127,10 @@ while [ "$1" != "" ]; do
 								password=$1
 								;;
 		-i | --ina220)			shift
-								i2caddr=$1
+								i2caddr=${1,,}			#to convert all to lower case
+								;;
+		-b | --i2cbus)			shift
+								i2cbus=$1
 								;;
 		-a | --address)			shift
 								address=$1
@@ -157,25 +162,33 @@ if [ "$cpuUsage" = "1" ]; then
 #	message=`$sshc "top -n 2|grep Cpu|tail -n1"`
 #	echo $message
 	v0=$($sshc "top -n 2|grep Cpu|tail -n1" 2>&1|grep Cpu|awk '{print $2+$4+$6+$10+$12+$14+$16}')
-	output="${output},$v0"
+	output="${output}, $v0"
 fi
 
 if [ "$program" != "" ]; then
 #	"top -n 1 -d 20" 2>&1 |grep 20190|awk '{printf $9 "\n"}'
 	v0=$($sshc "top -n 1|grep $program" 2>&1|grep $program|awk '{print $10}')
-	output="${output},$v0"
+	output="${output}, $v0"
 fi
 
 if [ "$i2caddr" != "" ]; then
 #	"cat /sys/class/i2c-dev/i2c-5/device/5-0041/hwmon/hwmon*/curr1_input"
-	message=$($sshc "cat /sys/class/i2c-dev/i2c-${i2cbus}/device/${i2cbus}-00${i2caddr}/hwmon/hwmon*/in1_input && cat /sys/class/i2c-dev/i2c-${i2cbus}/device/${i2cbus}-00${i2caddr}/hwmon/hwmon*/curr1_input"|tr '\r\n' ' ')
-	echo $message
-	echo
+	comm=
+#	i2carray=($i2caddr)
+#	for addr in ${i2carray[@]}; do
+#	i2caddr=${i2caddr,,}			#to convert all to lower case
+	for addr in ${i2caddr}; do
+		if [ "$comm" != "" ]; then 
+			comm="${comm};" 
+		fi
+		comm="${comm} cat /sys/class/i2c-dev/i2c-${i2cbus}/device/${i2cbus}-00${addr}/hwmon/hwmon*/in1_input; cat /sys/class/i2c-dev/i2c-${i2cbus}/device/${i2cbus}-00${addr}/hwmon/hwmon*/curr1_input"
+	done
+#	echo $comm
+	message=$($sshc $comm 2>&1|grep -vE "Warning|Connection"|tr ',' ';'|tr '\r\n' ', ')  #convert ',' so each data occupy 1 position in CSV output
+#	echo $message
+#	echo
 
-	v0=$(echo $message|awk '{print $1}')
-	i0=$(echo $message|awk '{print $2}')
-
-	output="${output}, $v0, $i0"
+	output="${output}, $message"
 fi
 
 echo $output
