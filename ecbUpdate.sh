@@ -2,6 +2,7 @@
 # For update 8ui ECB aprom and/or envtable
 # By John.xu
 # need: nuvoisp, pl2303_example
+# * not fully tested
 
 # Usage example:
 # 1) sudo ./SampleForUpdateFirmware.sh "-f /data/aprom-000006.bin -t /data/ecbtable.bin"
