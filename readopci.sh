@@ -172,7 +172,7 @@ output="$(date +"%d-%T")"
 if [ "$cpuUsage" = "1" ]; then
 #	message=`$sshc "top -n 2|grep Cpu|tail -n1"`
 #	echo $message
-	v0=$($sshc "top -n 2|grep Cpu|tail -n1" 2>&1|grep Cpu|awk '{print $2+$4+$6+$10+$12+$14+$16}')
+	v0=$($sshc "top -n 2 -d1 -b|grep Cpu|tail -n1" 2>&1|grep Cpu|awk '{print $2+$4+$6+$10+$12+$14+$16}')
 	output="${output}, $v0"
 fi
 
