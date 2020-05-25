@@ -12,10 +12,12 @@
 #	* loop reading
 #	* delay time setting
 #	* option to write to file
+# Version 0.11
+#	- read cpu temperature when -c is specified, using hwmon0/temp1_input
 #=========================================================================
 TAG="${0##*/}"				#get the base name of itself
 ############ Functions
-Version="0.1"
+Version="0.11"
 version()
 {
 	echo "$TAG version $Version"
@@ -29,15 +31,15 @@ usage()	#edit
 		-h or --help to display this message
 		-v or --version to display version information
 		-f or --fieldname to output field names
-		-c or --cpu to read cpu load percentage also
+		-c or --cpu to read cpu load percentage and cpu temperature
 
-		-p or --program specify which program or pid should be checked (the cpu load)
+		-p or --program specify which program or pid should be checked (for its cpu load)
 		-u or --user specify the user name for ssh connection, default: ubuntu
 		-w or --word specify the password to be used for ssh connection, default: ubuntu
 		-a or --address to specify the ipaddress for ssh connection, the switch can be omitted
 
 		-b or --i2cbus to specify i2cbus number (default 6. for 8u2i and cc48smi it should be 5)
-		-i or --ina220 to specify reading an ina220 sensor (hex i2c address) Voltage, Current, Power. 
+		-i or --ina220 to specify i2c addresses of ina220 sensors to be read (hex i2c address) 
 		
 		-m or --humidity to read temperature/humidity from hdc1080 0x40 
 		-t or --temperature to read temperature sensor tmp275 0x48
@@ -53,6 +55,9 @@ outfieldname()
 	fi
 	if [ "$program" != "" ]; then
 		output="${output}, ${program}"
+	fi
+	if [ "$cpuUsage" = "1" ]; then
+		output="${output}, CPU_Temp"
 	fi
 	if [ "$humidity" = "1" ]; then
 		output="${output}, Temp1080, Humi1080"
@@ -196,8 +201,14 @@ if [ "$program" != "" ]; then
 fi
 
 comm=
+if [ "$cpuUsage" = "1" ]; then
+	comm="cat /sys/class/hwmon/hwmon0/temp1_input"
+fi
 if [ "$humidity" = "1" ]; then
-	comm="cat /sys/class/i2c-dev/i2c-$i2cbus/device/$i2cbus-0040/iio\:device*/in_humidityrelative_raw;cat /sys/class/i2c-dev/i2c-$i2cbus/device/$i2cbus-0040/iio\:device*/in_temp_raw"
+	if [ "$comm" != "" ]; then 
+		comm="${comm};"
+	fi
+	comm="${comm}cat /sys/class/i2c-dev/i2c-$i2cbus/device/$i2cbus-0040/iio\:device*/in_humidityrelative_raw;cat /sys/class/i2c-dev/i2c-$i2cbus/device/$i2cbus-0040/iio\:device*/in_temp_raw"
 fi
 if [ "$temperature" = "1" ]; then
 	if [ "$comm" != "" ]; then 
@@ -221,7 +232,8 @@ if [ "$i2caddr" != "" ]; then
 	done
 fi
 
-if [ "$i2caddr" != "" ]; then
+#if [ "$i2caddr" != "" ]; then
+if [ "$comm" != "" ]; then
 #	echo $comm
 	message=$($sshc $comm 2>&1|grep -vE "Warning|Connection"|tr ',' ';'|tr '\r\n' ', '|sed 's/, $//')  
 # convert ',' so each data occupy 1 position in CSV output. replace newline with comma, and remove the last one
