@@ -14,6 +14,7 @@
 #	* option to write to file
 # Version 0.11
 #	- read cpu temperature when -c is specified, using hwmon0/temp1_input
+#	- when ip address is not specified, read data from host (no ssh command needed)
 #=========================================================================
 TAG="${0##*/}"				#get the base name of itself
 ############ Functions
@@ -27,7 +28,7 @@ usage()	#edit
 {
 	version
 	cat << EOF
-	USAGE: $TAG [-hvfc] [-p program] [-u username] [-w password] [-m -t -l] [-b i2cbus] [-i "i2caddr0 i2caddr1 ..."] [-a] <ipaddress>
+	USAGE: $TAG [-hvfc] [-p program] [-u username] [-w password] [-m -t -l] [-b i2cbus] [-i "i2caddr0 i2caddr1 ..."] [-a] [ipaddress]
 		-h or --help to display this message
 		-v or --version to display version information
 		-f or --fieldname to output field names
@@ -37,6 +38,7 @@ usage()	#edit
 		-u or --user specify the user name for ssh connection, default: ubuntu
 		-w or --word specify the password to be used for ssh connection, default: ubuntu
 		-a or --address to specify the ipaddress for ssh connection, the switch can be omitted
+				if ipaddress is omitted, read data locally (from host machine)
 
 		-b or --i2cbus to specify i2cbus number (default 6. for 8u2i and cc48smi it should be 5)
 		-i or --ina220 to specify i2c addresses of ina220 sensors to be read (hex i2c address) 
@@ -45,6 +47,16 @@ usage()	#edit
 		-t or --temperature to read temperature sensor tmp275 0x48
 		-l or --light to read light sensor ALS 0x44
 EOF
+}
+
+error_check() {
+#	if [ "$address" = "" ]
+#	then
+		MESSAGE="$(eval ${1} 2>&1)"
+		echo $MESSAGE
+#	else
+#			fi
+	
 }
 
 outfieldname()	
@@ -157,32 +169,35 @@ while [ "$1" != "" ]; do
     shift
 done
 
-if [ "$address" = "" ]
-then
-	usage
-	exit
-fi
-
 if [ "$field" = 1 ]
 then
 	outfieldname
 	exit
 fi
 
+if [ "$address" != "" ]
+then
 # ssh command, "sshpass -p ubuntu ssh -t ubuntu@192.168.1.19"
-sshc="sshpass -p $password ssh -t ${username}@${address}" 
+	sshc="sshpass -p $password ssh -t ${username}@${address} " 
+else
+	sshc=""
 #echo $sshc
+fi
+
 output="$(date +"%d-%T")"	
 
 if [ "$cpuUsage" = "1" ]; then
 #	message=`$sshc "top -n 2|grep Cpu|tail -n1"`
 #	echo $message
-	v0=$($sshc "top -n 2 -d1 -b|grep Cpu|tail -n1" 2>&1|grep Cpu|awk '{print $2+$4+$6+$10+$12+$14+$16}')
+	comm="top -n 2 -d1 -b"
+	message=$($sshc $comm 2>&1|grep Cpu|tail -n1)
+	v0=$(echo $message|awk '{print $2+$4+$6+$10+$12+$14+$16}')
 	output="${output}, $v0"
 fi
 
 if [ "$program" != "" ]; then
-	message=$($sshc "top -b -n 1" 2>&1|grep -E "%CPU|$program")			# -b is important, without it top output escaped sequence, thus could find the exact index
+	comm="top -b -n 1"
+	message=$($sshc $comm 2>&1|grep -E "%CPU|$program")			# -b is important, without it top output escaped sequence, thus could find the exact index
 #	echo "$message"
 #	index=$(getIndexOfWord "%CPU" $(echo "$message"|head -n 1))
 	message1=$(echo "$message"|grep %CPU)
