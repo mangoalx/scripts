@@ -33,6 +33,12 @@
 #	+ hardware test for 8u2i
 #	- Main menu only for hardware & firmware test
 #	* allow input 2 letters as menu selection (if $opt=='' then opt=option)
+# Version 1.11
+#	- add command for hunt control
+# Version 1.12
+#	* add auto brightness
+#	  
+Version="V1.12"
 
 TAG="${0##*/}"
 
@@ -263,16 +269,17 @@ generate_post_data ()
 EOF
 }
 generate_patch_data ()
+#  "power": "$1","brightness": "$2"
 {
   cat <<EOF
 {
-  "power": "$1","brightness": "$2"
+  "$1": "$2"
 }
 EOF
 }
 test_Orientation () {
 	local input
-	originOrientation=$(curl http://127.0.0.1:5000/sysinfo/orientation 2>null | jq '.orientation' | tr -d \")
+	originOrientation=$(curl http://127.0.0.1:5000/sysinfo/orientation 2>/dev/null | jq '.orientation' | tr -d \")
 	echo "originOrientation= $originOrientation"
 	while true	
 	do
@@ -292,7 +299,7 @@ test_Orientation () {
 	done	
 }
 test_Sensors () {
-	local sensors=$(curl http://127.0.0.1:5000/environment/sensors 2>null | jq '."Environment sensor list"[]' | tr -d \")
+	local sensors=$(curl http://127.0.0.1:5000/environment/sensors 2>/dev/null | jq '."Environment sensor list"[]' | tr -d \")
 	for s in $sensors
 	do
 		echo "${s}:"
@@ -300,7 +307,7 @@ test_Sensors () {
 	done
 }
 test_Power () {
-	local sensors=$(curl http://127.0.0.1:5000/power 2>null | jq '."Power sensor list"[]' | tr -d \")
+	local sensors=$(curl http://127.0.0.1:5000/power 2>/dev/null | jq '."Power sensor list"[]' | tr -d \")
 	for s in $sensors
 	do
 		echo "${s}:"
@@ -309,21 +316,33 @@ test_Power () {
 }
 test_Backlight () {
 	local brightness power
+	curl http://127.0.0.1:5000/display/backlight
 	while true
 	do
-		read -p 'Input the desired brightness [0 to 100, 0 for off, x to exit, Enter to read]:' brightness
+		read -p 'Input brightness [0 ~ 100, a for auto, P/p for on/off, H/h for hunt_effect on/off, x to exit, Enter to read]:' brightness
 		if [ -z $brightness ]
 			then 	curl http://127.0.0.1:5000/display/backlight
 			continue
 		fi
 		case $brightness in
-			0) power="off" ;;
+			P) data="on"
+			   name="power" ;;
+			p) data="off"
+			   name="power" ;;
+			H) data="on"
+			   name="hunt_effect" ;;
+			h) data="off"
+			   name="hunt_effect" ;;
+			a* | A*) data="auto"
+				name="brightness" ;; 
 			x* | X*) return ;;
-			*) power="on" ;;
+			*) data="$brightness"
+			   name="brightness" ;;
 		esac
 #		curl -i -H "Content-Type: application/json" -X PATCH -d '{"power":"on", "brightness": 25}' http://127.0.0.1:5000/display/backlight
+# curl -i -H "Content-Type: application/json" -X PATCH -d '{"brightness": "auto"}' http://127.0.0.1:5000/display/backlight
 #		echo $(generate_patch_data $brightness $power)
-		curl -i -H "Content-Type: application/json" -X PATCH -d "$(generate_patch_data $power $brightness)" http://127.0.0.1:5000/display/backlight
+		curl -i -H "Content-Type: application/json" -X PATCH -d "$(generate_patch_data $name $data)" http://127.0.0.1:5000/display/backlight
 	done
 }
 test_Resetbutton () {
@@ -338,7 +357,7 @@ test_Resetbutton () {
 			fi
 			continue				#if user input something, skip the reading
 		else						#timeout without input, then test reset button
-			echo -n $(curl http://127.0.0.1:5000/sysinfo/resetbutton 2>null | jq '."Reset Button"' | tr -d \n\")
+			echo -n $(curl http://127.0.0.1:5000/sysinfo/resetbutton 2>/dev/null | jq '."Reset Button"' | tr -d \n\")
 		fi
 	done
 }
@@ -543,6 +562,7 @@ submenuEcb () {
 		"Ecb_table" 
 		"Update"
 		"Door_alert"
+		"Psu_error"
 		"Assembly"
 		"Fan_alert"
 		"State"
@@ -555,6 +575,7 @@ submenuEcb () {
 			e | E) opt="Ecb_table";;
 			u | U) opt="Update";;
 			d | D) opt="Door_alert";;
+			p | P) opt="Psu_error";;
 			a | A) opt="Assembly";;
 			f | F) opt="Fan_alert";;
 			s | S) opt="State";;
@@ -574,6 +595,9 @@ submenuEcb () {
 				;;
 			Do*)				#Door_alert
 				curl http://127.0.0.1:5000/ecb/door_alert				
+				;;
+			Ps*)				#Psu_error, since RC131 this item replaced door_alert
+				curl http://127.0.0.1:5000/ecb/psu_error				
 				;;
 			As*)				#Assembly
 				curl http://127.0.0.1:5000/ecb/assembly
@@ -641,7 +665,7 @@ submenuH()
 }
 main()
 {
-	echo "Videri OPCi Telemetry Test"
+	echo "Videri OPCi Test $Version"
 	PS3='Please enter your choice (Enter to re-display the menu): '
 	options=("test Hardware"
 			 "test Firmware/val"
