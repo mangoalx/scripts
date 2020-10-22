@@ -2,6 +2,9 @@
 # 
 # by John Xu
 # For DPC4xx device CPU temperature reading
+# If sx7 and ecb sensors data are desired, then adb root connection is needed 
+#    (you’ll need a userdebug version firmware installed on the device)
+#   https://videri.atlassian.net/wiki/spaces/QA/pages/944668705/How+to+read+5U2+6U2+5U+6U+temperature+sensors
 # Version 0.2
 #	put all output in single line and seperate each data with a comma, so it will be easily imported into excel
 # 	tr command in each line is used to remove carriage return from each reading output

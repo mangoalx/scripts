@@ -15,6 +15,8 @@
 # Version 0.11
 #	- read cpu temperature when -c is specified, using hwmon0/temp1_input
 #	- when ip address is not specified, read data from host (no ssh command needed)
+#
+#	* find program name at the "command" session, 'bsp' could appear as user
 #=========================================================================
 TAG="${0##*/}"				#get the base name of itself
 ############ Functions
@@ -72,7 +74,7 @@ outfieldname()
 		output="${output}, CPU_Temp"
 	fi
 	if [ "$humidity" = "1" ]; then
-		output="${output}, Temp1080, Humi1080"
+		output="${output}, Humi1080, Temp1080"
 	fi
 	if [ "$temperature" = "1" ]; then
 		output="${output}, Tmp275"
