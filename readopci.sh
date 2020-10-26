@@ -12,15 +12,17 @@
 #	* loop reading
 #	* delay time setting
 #	* option to write to file
-# Version 0.11
+# Version 0.12
 #	- read cpu temperature when -c is specified, using hwmon0/temp1_input
 #	- when ip address is not specified, read data from host (no ssh command needed)
 #
-#	* find program name at the "command" session, 'bsp' could appear as user
+#	- find program name at the "command" session, 'bsp' could appear as user
+#	- if a program appeared multitimes, plus togather
+#	* allow multi program
 #=========================================================================
 TAG="${0##*/}"				#get the base name of itself
 ############ Functions
-Version="0.11"
+Version="0.12"
 version()
 {
 	echo "$TAG version $Version"
@@ -92,6 +94,17 @@ outfieldname()
 }
 
 #index=
+wordindex () {
+    words=( ${1} )
+    for ((i=0; i < ${#words[@]}; i++)); do
+#		echo ${words[i]}
+        if [[ ${words[i]} == *$2* ]]; then
+            echo $i
+            break
+        fi
+    done
+}
+
 getIndexOfWord () 			# deprecated, find out the index of a word in a string (word, string)
 {
 	echo "Entered getIndex"
@@ -202,18 +215,44 @@ if [ "$program" != "" ]; then
 	message=$($sshc $comm 2>&1|grep -E "%CPU|$program")			# -b is important, without it top output escaped sequence, thus could find the exact index
 #	echo "$message"
 #	index=$(getIndexOfWord "%CPU" $(echo "$message"|head -n 1))
-	message1=$(echo "$message"|grep %CPU)
-	message2=$(echo "$message"|grep $program)
+	message1=$(echo "$message"|grep %CPU|tr -dc "[:print:]\n")		# seems that reading from ssh would include some special chars that we need to get rid of
+	message2=$(echo "$message"|grep $program|tr -dc "[:print:]\n")	# use tr -dc to remove special chars
+#	echo "$message1"
 #	echo "$message2"
-	index=$(strindex "${message1}" "%CPU")
+	index=$(wordindex "${message1}" "%CPU")
+#	echo "index=${index}"
+	index0=$(wordindex "${message1}" "COMMAND")
+#	if [ "$index0" != "" ]; then      #with new wordindex function, no need to minus 1
+#		((--index0))
+#	else
+#		index0=1
+#	fi
 #	getIndexOfWord "%CPU" "${message1}"
-#	echo $index
-	if [ "$index" != "" ]; then
-		((--index))
-		v0="${message2:$index:5}"
-	else
-		v0=""
-	fi
+#	echo "index0 = ${index0}"
+#	if [ "$index" != "" ]; then			#with new wordindex function, no need to minus 1
+#		((--index))
+#	else
+#		index=0
+#	fi
+	v0=""
+	while IFS= read -r line; do
+#    	echo "... $line ..."
+		arr=($line)
+		if [ "${arr[index0]}" == "$program" ]; then
+			if [ "$v0" = "" ]; then
+				v0="${arr[index]}"
+			else
+				v0="${v0}+${arr[index]}"
+			fi
+#			echo "${arr[index0]}"
+#			echo "v0 = $v0"
+		fi 
+#			if [ "$index0" != "" ]; then
+	done <<< "$message2"
+#		v0="${message2:$index:5}"
+#	else
+#		v0=""
+#	fi
 	output="${output}, $v0"
 fi
 
