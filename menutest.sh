@@ -36,9 +36,13 @@
 # Version 1.11
 #	- add command for hunt control
 # Version 1.12
-#	* add auto brightness
-#	  
-Version="V1.12"
+#	- add auto brightness
+# Version 1.13
+#	- add biosverion in sysinfo menu
+#	- add lcd /display/lcd 
+# Version 1.14
+#	- support 277V 8u2i partnumber VEN075ULPWB20
+Version="V1.14"
 
 TAG="${0##*/}"
 
@@ -68,7 +72,7 @@ partnumber=$(GET_EFIVAR PartNumber)
 echo "$TAG: partnumber=[$partnumber]"
 
 declare -A canvas_partno			#dictionary for partno to canvas converting
-canvas_partno=([VEN026QSNWM00]=Qsmi [VEN026QSNWM50]=qsmi_R211 [VEN032FSNWM00]=3smi [VEN048CSVWM00]=Cc48smi [VEN075ULPWB10]=8U2i)
+canvas_partno=([VEN026QSNWM00]=Qsmi [VEN026QSNWM50]=qsmi_R211 [VEN032FSNWM00]=3smi [VEN048CSVWM00]=Cc48smi [VEN075ULPWB10]=8U2i [VEN075ULPWB20]=8U2i)
 
 i2cbus=$(ls /sys/bus/pci/devices/0000\:00\:16.2/i2c_designware.2/ | grep i2c | cut -d "-" -f 2)
 echo "$TAG: i2cbus=[$i2cbus]"
@@ -314,6 +318,14 @@ test_Power () {
 		curl http://127.0.0.1:5000/power/$s
 	done
 }
+test_Display () {
+	local displays=$(curl http://127.0.0.1:5000/display 2>/dev/null | jq '."Display list"[]' | tr -d \")
+	for d in $displays
+	do
+		echo "${d}:"
+		curl http://127.0.0.1:5000/display/$d
+	done
+}
 test_Backlight () {
 	local brightness power
 	curl http://127.0.0.1:5000/display/backlight
@@ -432,6 +444,7 @@ submenuF () {
 		"firmware Version" 
 		"Resolution dimension"
 		"sysInfo"
+		"Display"
 		"Backlight"
 		"Sensors"
 		"Power"
@@ -447,6 +460,7 @@ submenuF () {
 			v | V) opt="firmware Version";;
 			r | R) opt="Resolution dimension";;
 			i | I) opt="sysInfo";;
+			d | D) opt="Display";;
 			b | B) opt="Backlight";;
 			s | S) opt="Sensors";;
 			p | P) opt="Power";;
@@ -467,6 +481,10 @@ submenuF () {
 			sy*)				#sysInfo
 				execDisplay "curl http://127.0.0.1:5000/sysinfo"
 				submenuSysinfo
+				;;
+			Di*)				#Display
+				execDisplay "curl http://127.0.0.1:5000/display"
+				test_Display
 				;;
 			Ba*)				#Backlight 
 				test_Backlight ;;
@@ -492,6 +510,7 @@ submenuSysinfo () {
 	local PS3='Please select an item to test (Enter to re-display the menu): '
 	local options=(
 		"forceUpdate" 
+		"Biosversion" 
 		"Model"
 		"selfTest"
 		"Status"
@@ -506,6 +525,7 @@ submenuSysinfo () {
 	do
 		case $REPLY in
 			u | U) opt="forceUpdate";;
+			b | B) opt="Biosversion";;
 			m | M) opt="Model";;
 			t | T) opt="selfTest";;
 			s | S) opt="Status";;
@@ -524,6 +544,9 @@ submenuSysinfo () {
 			fo*)				#forceUpdate
 				echo "Executing force update, please wait ... "
 				curl -i -H "Content-Type: application/json" -X POST -d '{"update": true}' http://127.0.0.1:5000/sysinfo/forceupdate
+				;;
+			Bi*)				#Model
+				curl http://127.0.0.1:5000/sysinfo/BIOSversion
 				;;
 			Mo*)				#Model
 				curl http://127.0.0.1:5000/sysinfo/model
@@ -627,8 +650,9 @@ submenuH()
 			 "test Qsmi"
 			 "test Cc48smi"
 			 "test qsmi_R211"
+			 "eXit"
 			 "test 8U2i"
-			 "eXit")
+			)
 	local opt
 	select opt in "${options[@]}"
 	do
