@@ -28,11 +28,27 @@ usage()
 {
 	version
 	cat << EOF
-	USAGE: $TAG [-hvfcxpe] [-d <delay>] [[-s] <serialNo>]
-		Without parameter, will start interactive menu mode
+	USAGE: $TAG [-h|-v|-r|-t] [parameter]
+		Without any option/parameter, to enter interactive menu
 		-v or --version to display version information
 		-h or --help to display help information
-
+		-r or --read to read a sensor or variable, use parameter to specify
+			parameter for read could be 1 of:
+				Pn - part number
+				Sn - serial number
+				Fw - firmware version
+				Dim- dimension/resolution
+				Efi- Efi variables
+				Mac- Mac addresses
+				Cpu- cpu temeratures
+				Acc- accelerator sensor
+				Gy - gyrometer sensor
+				Re - reset butoon
+				I2C address of sensors [40,41,42,44,45,46,48,4d,4e,4f,6f]
+		-t or --test to test the device, use parameter to specify device type
+			parameter for test could be 1 of:
+				auto - read device part number to find out device type
+				device model [8U2i,3smi,R211,Qsmi,Cc48smi]
 EOF
 }
 
