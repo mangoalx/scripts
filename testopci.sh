@@ -28,6 +28,7 @@ usage()
 {
 	version
 	cat << EOF
+<<<<<<< HEAD
 	USAGE: $TAG [-h|-v|-r|-t] [parameter]
 		Without any option/parameter, to enter interactive menu
 		-v or --version to display version information
@@ -49,6 +50,13 @@ usage()
 			parameter for test could be 1 of:
 				auto - read device part number to find out device type
 				device model [8U2i,3smi,R211,Qsmi,Cc48smi]
+=======
+	USAGE: $TAG [-hvfcxpe] [-d <delay>] [[-s] <serialNo>]
+		Without parameter, will start interactive menu mode
+		-v or --version to display version information
+		-h or --help to display help information
+
+>>>>>>> 439ac308c6bb7eb191d907147b0f644440862499
 EOF
 }
 
