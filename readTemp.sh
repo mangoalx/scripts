@@ -2,6 +2,9 @@
 # 
 # by John Xu
 # For DPC4xx device CPU temperature reading
+# If sx7 and ecb sensors data are desired, then adb root connection is needed 
+#    (you’ll need a userdebug version firmware installed on the device)
+#   https://videri.atlassian.net/wiki/spaces/QA/pages/944668705/How+to+read+5U2+6U2+5U+6U+temperature+sensors
 # Version 0.2
 #	put all output in single line and seperate each data with a comma, so it will be easily imported into excel
 # 	tr command in each line is used to remove carriage return from each reading output
@@ -30,10 +33,13 @@
 #	- prt reading conversion (1-digit float). Convert prt reading to actual degree value
 #		T = (reading/65536)*165-40
 #	* allow to specify where to find sx7 and nuvoisp tools
+# Version 1.2
+#	+ add cpu frequency reading
+#	* add environment temperature reading
 #=========================================================================
 TAG="${0##*/}"				#get the base name of itself
 ############ Functions
-Version="1.1"
+Version="1.2"
 version()
 {
 	echo "$TAG version $Version"
@@ -42,7 +48,7 @@ usage()
 {
 	version
 	cat << EOF
-	USAGE: $TAG [-hvfcxpe] [-d <delay>] [[-s] <serialNo>]
+	USAGE: $TAG [-hvfcxpeq] [-d <delay>] [[-s] <serialNo>]
 		-h or --help to display this message
 		-v or --version to display version information
 		-f or --fieldname to output field names
@@ -50,6 +56,7 @@ usage()
 		-x or --sx7 to read sx7 temperature
 		-p or --prt to read prt on board temperature
 		-e or --ecb to read ecb off board temperature sensors
+		-q or --freq to read cpu frequency
 
 		-d or --delay to specify how long to wait before reading data
 		              When -c is present, it is delay time for top, default as 3
@@ -63,6 +70,9 @@ outfieldname()
 	local output="Timestamp,A53_3,A53_0,A53_1,A53_2,A57_2,A57_0,A57_1,A57_3,A53-A57,GPU1,GPU2,Modem,Hexagon1,Hexagon2,Camera,MDSS"
 	if [ "$cpuUsage" = "1" ]; then
 		output="${output},CPU_load"
+	fi
+	if [ "$freq" = "1" ]; then
+		output="${output},freq0"
 	fi
 	if [ "$sx7" = "1" ]; then
 		output="${output},sx7"
@@ -122,6 +132,7 @@ field=
 sx7=
 prt=
 ecb=
+freq=
 topDelay=3			#top command by default delay 3 seconds
 
 while [ "$1" != "" ]; do
@@ -138,6 +149,9 @@ while [ "$1" != "" ]; do
                                 ;;
 		-c | --cpu)
 								cpuUsage=1 
+								;;
+		-q | --freq)
+								freq=1 
 								;;
 		-x | --sx7)
 								sx7=1 
@@ -197,6 +211,10 @@ if [ "$cpuUsage" = "1" ]; then
 	output="${output},$v0"
 else
 	sleep $topDelay
+fi
+if [ "$freq" = "1" ]; then
+	v0=$($adbc cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq | tr -d '\r')
+	output="${output},$v0"
 fi
 if [ "$sx7" = "1" ]; then
 	hexdata=`$adbc '/cache/sx7-tool -a "5c 01 02 00 00 00 00 00 00"'|grep '<==' |cut -d ' ' -f5 `
