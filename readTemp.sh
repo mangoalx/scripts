@@ -33,10 +33,14 @@
 #	- prt reading conversion (1-digit float). Convert prt reading to actual degree value
 #		T = (reading/65536)*165-40
 #	* allow to specify where to find sx7 and nuvoisp tools
+# Version 1.2
+#	- add cpu frequency reading
+#	- add environment temperature reading
+#	- add off board internal temperature sensor reading
 #=========================================================================
 TAG="${0##*/}"				#get the base name of itself
 ############ Functions
-Version="1.1"
+Version="1.2"
 version()
 {
 	echo "$TAG version $Version"
@@ -45,14 +49,19 @@ usage()
 {
 	version
 	cat << EOF
-	USAGE: $TAG [-hvfcxpe] [-d <delay>] [[-s] <serialNo>]
+	USAGE: $TAG [-hvfcqxpea] [-d <delay>] [[-s] <serialNo>]
 		-h or --help to display this message
 		-v or --version to display version information
 		-f or --fieldname to output field names
 		-c or --cpu to read cpu load percentage also
+		-q or --freq to read cpu frequency
 		-x or --sx7 to read sx7 temperature
 		-p or --prt to read prt on board temperature
 		-e or --ecb to read ecb off board temperature sensors
+		-a or --ambient to read ambient temperature sensor
+		-o or --offboard to read off board internal temperature sensor 0x1c & 0x1e
+		-o1 to read off board internal temperature sensor 0x48 (6xtV2)
+		-o2 to read off board internal temperature sensor 0x48 & 0x4c(6xt4)
 
 		-d or --delay to specify how long to wait before reading data
 		              When -c is present, it is delay time for top, default as 3
@@ -67,6 +76,9 @@ outfieldname()
 	if [ "$cpuUsage" = "1" ]; then
 		output="${output},CPU_load"
 	fi
+	if [ "$freq" = "1" ]; then
+		output="${output},freq0"
+	fi
 	if [ "$sx7" = "1" ]; then
 		output="${output},sx7"
 	fi
@@ -75,6 +87,14 @@ outfieldname()
 	fi
 	if [ "$ecb" = "1" ]; then
 		output="${output},ecb0,ecb1,ecb2,ecb3,ecb4,ecb5"
+	fi
+	if [ "$ambient" = "1" ]; then
+		output="${output},Tambient"
+	fi
+	if [ "$offboard" = "1" ]; then
+		output="${output},Tobs"
+	elif [ "$offboard" = "0" ] || [ "$offboard" = "2" ]; then
+		output="${output},Tobs0,Tobs1"
 	fi
 #	echo "Timestamp,A53_3,A53_0,A53_1,A53_2,A57_2,A57_0,A57_1,A57_3,A53-A57,GPU1,GPU2,Modem,Hexagon1,Hexagon2,Camera,MDSS,CPU_load,sx7,prt,ecb0,ecb1,ecb2,ecb3,ecb4,ecb5"
 	echo $output
@@ -125,6 +145,8 @@ field=
 sx7=
 prt=
 ecb=
+freq=
+ambient=
 topDelay=3			#top command by default delay 3 seconds
 
 while [ "$1" != "" ]; do
@@ -142,6 +164,9 @@ while [ "$1" != "" ]; do
 		-c | --cpu)
 								cpuUsage=1 
 								;;
+		-q | --freq)
+								freq=1 
+								;;
 		-x | --sx7)
 								sx7=1 
 								;;
@@ -150,6 +175,18 @@ while [ "$1" != "" ]; do
 								;;
 		-e | --ecb)
 								ecb=1 
+								;;
+		-a | --ambient)
+								ambient=1 
+								;;
+		-o | --offboard)
+								offboard=0 
+								;;
+		-o1)
+								offboard=1 
+								;;
+		-o2)
+								offboard=2 
 								;;
 		-d | --delay)			shift
 								topDelay=$1
@@ -201,6 +238,10 @@ if [ "$cpuUsage" = "1" ]; then
 else
 	sleep $topDelay
 fi
+if [ "$freq" = "1" ]; then
+	v0=$($adbc cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq | tr -d '\r')
+	output="${output},$v0"
+fi
 if [ "$sx7" = "1" ]; then
 	hexdata=`$adbc '/cache/sx7-tool -a "5c 01 02 00 00 00 00 00 00"'|grep '<==' |cut -d ' ' -f5 `
 #	echo $hexdata
@@ -221,6 +262,29 @@ if [ "$ecb" = "1" ]; then
 		ecbreading="${ecbreading},$d"
 	done
 	output="${output}$ecbreading"
+fi
+
+if [ "$ambient" = "1" ]; then
+#get device folder name
+	message=$($adbc head -n 1 /sys/bus/w1/devices/w1_bus_master1/w1_master_slaves)
+	echo $message
+	data=$($adbc cat /sys/bus/w1/devices/w1_bus_master1/${message//[$'\t\r\n']}/w1_slave)
+	echo $data
+	v0=$(sed -n '{N;s/^.*YES.*t=\([-[:digit:]]*\).*/\1/p}' <<< "$data")
+	output="${output},$v0"
+fi
+
+if [ "$offboard" = "1" ]; then
+	v0=$($adbc cat /sys/class/i2c-dev/i2c-9/device/9-0048/temp1_input | tr -d '\r')
+	output="${output},$v0"
+elif [ "$offboard" = "0" ]; then
+	v0=$($adbc cat /sys/class/i2c-dev/i2c-9/device/9-001c/temp1_input | tr -d '\r')
+	v1=$($adbc cat /sys/class/i2c-dev/i2c-9/device/9-001e/temp1_input | tr -d '\r')
+	output="${output},$v0,$v1"
+elif [ "$offboard" = "2" ]; then
+	v0=$($adbc cat /sys/class/i2c-dev/i2c-9/device/9-0048/temp1_input | tr -d '\r')
+	v1=$($adbc cat /sys/class/i2c-dev/i2c-9/device/9-004c/temp1_input | tr -d '\r')
+	output="${output},$v0,$v1"
 fi
 
 echo $output
