@@ -1,0 +1,1 @@
+/home/john/software/scripts/readTemp.sh
