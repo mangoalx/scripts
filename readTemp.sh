@@ -37,10 +37,22 @@
 #	- add cpu frequency reading
 #	- add environment temperature reading
 #	- add off board internal temperature sensor reading
+#  Version 1.21
+#	- add cpu frequency reading
+#	- add environment temperature reading
+#	- add off board internal temperature sensor reading
+#	+ remove env temp reading debug info
+# Version 1.22
+#	* -n --no to avoid reading temperature of cpu cores
+# Version 1.23
+#	- /1000 for Tobs0, Tobs1, Tambient, /100,000 for freq, x100 for load
+#	- cpu average
+#	* cpu average of 53/57, cpu max
+#	* output file option
 #=========================================================================
 TAG="${0##*/}"				#get the base name of itself
 ############ Functions
-Version="1.2"
+Version="1.23"
 version()
 {
 	echo "$TAG version $Version"
@@ -53,6 +65,7 @@ usage()
 		-h or --help to display this message
 		-v or --version to display version information
 		-f or --fieldname to output field names
+		-n or --no to skip cpu core temperature data
 		-c or --cpu to read cpu load percentage also
 		-q or --freq to read cpu frequency
 		-x or --sx7 to read sx7 temperature
@@ -72,12 +85,15 @@ EOF
 
 outfieldname()
 {
-	local output="Timestamp,A53_3,A53_0,A53_1,A53_2,A57_2,A57_0,A57_1,A57_3,A53-A57,GPU1,GPU2,Modem,Hexagon1,Hexagon2,Camera,MDSS"
+	local output="Timestamp"
+	if [ "$no" != "1" ]; then
+		output="${output},A53_3,A53_0,A53_1,A53_2,A57_2,A57_0,A57_1,A57_3,A53-A57,GPU1,GPU2,Modem,Hexagon1,Hexagon2,Camera,MDSS,Tavg"
+	fi
 	if [ "$cpuUsage" = "1" ]; then
-		output="${output},CPU_load"
+		output="${output},CPU_load%"
 	fi
 	if [ "$freq" = "1" ]; then
-		output="${output},freq0"
+		output="${output},freqx100K"
 	fi
 	if [ "$sx7" = "1" ]; then
 		output="${output},sx7"
@@ -134,8 +150,15 @@ getecb()
 convertprttemp()
 {
 	local data=$1
-	local result=$(($data*1650/65536-400))		#to get 1 digit decimal, multiple the formula with 10
-	echo "${result:0:-1}.${result: -1}"			#then display the point before last digit
+	local result=$(($data*16500/65536-4000))		#to get 2 digit decimal, multiple the formula with 100
+	echo "${result:0:-2}.${result: -2}"			#then display the point before last digit
+}
+
+division_2digits()
+{
+	local data=$1
+	local result=$(($data*100/$2))		#to get 1 digit decimal, multiple the formula with 10
+	echo "${result:0:-2}.${result: -2}"
 }
 
 ecbSensors=("00" "01" "02" "03" "04" "05")
@@ -148,6 +171,7 @@ ecb=
 freq=
 ambient=
 topDelay=3			#top command by default delay 3 seconds
+no=
 
 while [ "$1" != "" ]; do
     case $1 in
@@ -161,6 +185,9 @@ while [ "$1" != "" ]; do
                                 #exit
 								field=1
                                 ;;
+		-n | --no)
+								no=1 
+								;;
 		-c | --cpu)
 								cpuUsage=1 
 								;;
@@ -212,7 +239,9 @@ if [ -z "$serial" ]
 	else adbc="adb -s $serial wait-for-device shell"
 fi
 
+output="$(date +"%d-%T")"
 
+if [ "$no" != "1" ]; then
 	v11=$($adbc cat /sys/devices/virtual/thermal/thermal_zone11/temp | tr -d '\r')
 	v8=$($adbc cat /sys/devices/virtual/thermal/thermal_zone8/temp | tr -d '\r')
 	v9=$($adbc cat /sys/devices/virtual/thermal/thermal_zone9/temp | tr -d '\r')
@@ -229,17 +258,20 @@ fi
 	v3=$($adbc cat /sys/devices/virtual/thermal/thermal_zone3/temp | tr -d '\r')
 	v4=$($adbc cat /sys/devices/virtual/thermal/thermal_zone4/temp | tr -d '\r')
 	v5=$($adbc cat /sys/devices/virtual/thermal/thermal_zone5/temp | tr -d '\r')
-	
-	output="$(date +"%d-%T"),$v11,$v8,$v9,$v10,$v16,$v14,$v15,$v7,$v1,$v13,$v12,$v6,$v2,$v3,$v4,$v5"	
-
+	message=$(($v11+$v8+$v9+$v10+$v16+$v14+$v15+$v7+$v1+$v13+$v12+$v6+$v2+$v3+$v4+$v5))
+	result=$(division_2digits $message 16)
+	output="${output},$v11,$v8,$v9,$v10,$v16,$v14,$v15,$v7,$v1,$v13,$v12,$v6,$v2,$v3,$v4,$v5,$result"	
+fi
 if [ "$cpuUsage" = "1" ]; then
-	v0=$($adbc top -d $topDelay -m 1 -n 1|grep %,|sed -e 's/[^0-9 ]//g'|awk '{print $1+$2+$3+$4"%"}')
+#	v0=$($adbc top -d $topDelay -m 1 -n 1|grep %,|sed -e 's/[^0-9 ]//g'|awk '{print $1+$2+$3+$4"%"}')
+	v0=$($adbc top -d $topDelay -m 1 -n 1|grep %,|sed -e 's/[^0-9 ]//g'|awk '{print $1+$2+$3+$4}')
 	output="${output},$v0"
 else
 	sleep $topDelay
 fi
 if [ "$freq" = "1" ]; then
-	v0=$($adbc cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq | tr -d '\r')
+	message=$($adbc cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq | tr -d '\r')
+	v0=$(division_2digits $message 100000)	
 	output="${output},$v0"
 fi
 if [ "$sx7" = "1" ]; then
@@ -267,23 +299,29 @@ fi
 if [ "$ambient" = "1" ]; then
 #get device folder name
 	message=$($adbc head -n 1 /sys/bus/w1/devices/w1_bus_master1/w1_master_slaves)
-	echo $message
+#	echo $message
 	data=$($adbc cat /sys/bus/w1/devices/w1_bus_master1/${message//[$'\t\r\n']}/w1_slave)
-	echo $data
-	v0=$(sed -n '{N;s/^.*YES.*t=\([-[:digit:]]*\).*/\1/p}' <<< "$data")
+#	echo $data
+	message=$(sed -n '{N;s/^.*YES.*t=\([-[:digit:]]*\).*/\1/p}' <<< "$data")
+	v0=$(division_2digits $message 1000)
 	output="${output},$v0"
 fi
 
 if [ "$offboard" = "1" ]; then
-	v0=$($adbc cat /sys/class/i2c-dev/i2c-9/device/9-0048/temp1_input | tr -d '\r')
+	message=$($adbc cat /sys/class/i2c-dev/i2c-9/device/9-0048/temp1_input | tr -d '\r')
+	v0=$(division_2digits $message 1000)
 	output="${output},$v0"
 elif [ "$offboard" = "0" ]; then
-	v0=$($adbc cat /sys/class/i2c-dev/i2c-9/device/9-001c/temp1_input | tr -d '\r')
-	v1=$($adbc cat /sys/class/i2c-dev/i2c-9/device/9-001e/temp1_input | tr -d '\r')
+	message=$($adbc cat /sys/class/i2c-dev/i2c-9/device/9-001c/temp1_input | tr -d '\r')
+	v0=$(division_2digits $message 1000)
+	message=$($adbc cat /sys/class/i2c-dev/i2c-9/device/9-001e/temp1_input | tr -d '\r')
+	v1=$(division_2digits $message 1000)
 	output="${output},$v0,$v1"
 elif [ "$offboard" = "2" ]; then
-	v0=$($adbc cat /sys/class/i2c-dev/i2c-9/device/9-0048/temp1_input | tr -d '\r')
-	v1=$($adbc cat /sys/class/i2c-dev/i2c-9/device/9-004c/temp1_input | tr -d '\r')
+	message=$($adbc cat /sys/class/i2c-dev/i2c-9/device/9-0048/temp1_input | tr -d '\r')
+	v0=$(division_2digits $message 1000)
+	message=$($adbc cat /sys/class/i2c-dev/i2c-9/device/9-004c/temp1_input | tr -d '\r')
+	v1=$(division_2digits $message 1000)
 	output="${output},$v0,$v1"
 fi
 
